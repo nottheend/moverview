@@ -1,9 +1,4 @@
 {
-  "id": "info.nottheend.fireflyui",
-  "title": "Firefly Dashboard",
-  "author": "Nottheend <info@nottheend.info>",
-  "description": "Custom dashboard UI for Firefly-III",
-  "tagline": "A cleaner Firefly-III interface with Cloudron SSO",
   "version": "0.0.1",
   "healthCheckPath": "/api/health",
   "httpPort": 3000,
@@ -11,7 +6,5 @@
     "proxyAuth": {},
     "localstorage": {}
   },
-  "manifestVersion": 2,
-  "website": "https://github.com/nottheend/moverview",
-  "contactEmail": "info@nottheend.info"
+  "manifestVersion": 2
 }
