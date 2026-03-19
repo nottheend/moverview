@@ -1,15 +1,6 @@
-/**
- * api.js — all network calls go through here.
- *
- * Auth endpoints hit /api/auth/*.
- * Firefly data hits /api/firefly/* which the backend proxies to Firefly-III.
- *
- * On 401 the caller should redirect to /login (handled in App.jsx).
- */
-
 async function request(path, options = {}) {
   const res = await fetch(path, {
-    credentials: 'include', // send session cookie
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
   });
@@ -24,29 +15,28 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
 export const auth = {
   me: () => request('/api/auth/me'),
-  login: (username, password) =>
-    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 };
 
-// ── Firefly-III ───────────────────────────────────────────────────────────────
-
 export const firefly = {
-  /** Returns the accounts list. type can be 'asset', 'expense', 'revenue', etc. */
   accounts: (type = 'asset', page = 1) =>
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
-  /** Returns paginated transactions */
-  transactions: (page = 1, type = 'default') =>
-    request(`/api/firefly/transactions?page=${page}&type=${type}`),
-
-  /** Returns basic user info from Firefly */
-  about: () => request('/api/firefly/about/user'),
-
-  /** Returns account with its current balance */
-  account: (id) => request(`/api/firefly/accounts/${id}`),
+  // Fetch up to 100 transactions sorted by date descending.
+  // Firefly's API is paginated at 50/page so we fetch page 1 + 2 and merge.
+  transactions: async () => {
+    const [p1, p2] = await Promise.all([
+      request('/api/firefly/transactions?page=1&limit=50&type=default'),
+      request('/api/firefly/transactions?page=2&limit=50&type=default'),
+    ]);
+    const all = [...(p1.data || []), ...(p2.data || [])];
+    // Sort by date descending (most recent first)
+    return all.sort((a, b) => {
+      const da = new Date(a.attributes?.transactions?.[0]?.date || 0);
+      const db = new Date(b.attributes?.transactions?.[0]?.date || 0);
+      return db - da;
+    });
+  },
 };
