@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-# Auto-generate SESSION_SECRET on first run if not set via env var.
-# Stored in /app/data (persisted by Cloudron's localstorage addon).
+export NODE_ENV=production
+
+# Auto-generate SESSION_SECRET on first run if not set.
 if [ -z "$SESSION_SECRET" ]; then
   SECRET_FILE=/app/data/session.secret
   if [ ! -f "$SECRET_FILE" ]; then
