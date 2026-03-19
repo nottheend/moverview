@@ -1,10 +1,10 @@
 # Firefly Dashboard
 
 A custom dashboard UI for [Firefly-III](https://www.firefly-iii.org/), designed to run as a
-**packaged Cloudron app** with Cloudron OIDC single sign-on.
+**packaged Cloudron app** with Cloudron proxyAuth single sign-on.
 
 **Current state:** read-only dashboard — asset account balances + recent transactions.
-Auth via Cloudron OIDC (true SSO — users are already logged in from the Cloudron dashboard).
+Auth via Cloudron proxyAuth (true SSO — users are already logged in from the Cloudron dashboard).
 The Firefly API token lives only on the server, never in the browser.
 
 ---
@@ -14,27 +14,27 @@ The Firefly API token lives only on the server, never in the browser.
 ```
 Browser → React (Vite) → Express backend → Firefly-III API
                                 ↑
-                        Cloudron OIDC (SSO)
+                        Cloudron proxyAuth (SSO)
 ```
 
 | Folder | What it does |
 |---|---|
 | `client/` | React + Vite + Tailwind frontend |
-| `server/` | Node.js/Express: OIDC auth, session, Firefly proxy |
+| `server/` | Node.js/Express: auth header, session, Firefly proxy |
 | `Dockerfile` | Multi-stage build → single container |
-| `CloudronManifest.json` | Tells Cloudron: port, addons, env vars |
+| `CloudronManifest.json` | Tells Cloudron: port, addons |
 | `Makefile` | All commands a solo dev needs |
 
 ---
 
 ## Auth: how it works
 
-**In production (Cloudron):** Cloudron injects OIDC credentials automatically. Users are
-redirected to the Cloudron login page if not already logged in — our app never sees their
-password. True SSO: if already logged into Cloudron, they go straight to the dashboard.
+**In production (Cloudron):** Cloudron's `proxyAuth` addon puts its own login wall in front
+of the app. After login, Cloudron injects `X-Cloudron-Username` into every request. Our app
+reads that header — it never sees a password.
 
-**In local dev:** OIDC is skipped entirely. The server auto-logs you in as `devuser` so
-you go straight to the dashboard with no login screen. Just `make dev` and open the browser.
+**In local dev:** The header won't exist, so the server automatically uses `devuser`. You go
+straight to the dashboard with no login screen. Just `make dev` and open the browser.
 
 ---
 
@@ -50,12 +50,11 @@ wsl --install
 
 Restart your PC. Open **Ubuntu** from the Start menu — this is your terminal from now on.
 
-Install Node.js, make, and wslu (needed to open browser from WSL) inside Ubuntu:
+Install Node.js, make, and wslu inside Ubuntu:
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install nodejs make wslu
-sudo npm install -g cloudron@6
 ```
 
 Your Windows files are at `/mnt/c/Users/YourName/...` inside Ubuntu.
@@ -67,7 +66,7 @@ cp .env.example .env
 # edit .env → set FIREFLY_BASE_URL and FIREFLY_TOKEN
 
 make dev
-# open http://localhost:5173 — you are logged in automatically as devuser
+# open http://localhost:5173 — logged in automatically as devuser
 ```
 
 ### Picking it up again later
@@ -84,25 +83,32 @@ make dev
 
 ### One-time: login to Cloudron CLI
 
-> **WSL note:** The latest Cloudron CLI uses browser-based login which requires
-> `wslu` (installed above). If it still fails with "does not support device flow",
-> your Cloudron version is too old for the latest CLI. Pin an older CLI version:
-> `sudo npm install -g cloudron@6`
-> Then login with username/password directly:
-> `cloudron login my.nottheend.info -u youruser -p 'yourpassword'`
-> This flag-based login is deprecated after Cloudron 9.1 — if it breaks in the future,
-> update Cloudron itself and use the browser login instead.
+The Cloudron CLI has a version mismatch problem on WSL:
+- **Latest CLI** needs a browser to login — WSL has no browser
+- **cloudron@6** supports username/password login but can't deploy with `--image`
+
+**Solution: use both versions — login with v6, then switch to latest for deploying.**
 
 ```bash
-cloudron login my.nottheend.info
+# Step 1 — login with v6 (no browser needed)
+sudo npm install -g cloudron@6
+cloudron login my.nottheend.info -u youruser -p 'yourpassword'
+
+# Step 2 — switch to latest for deploying
+sudo npm install -g cloudron
 ```
 
-### One-time: login to Docker registry
+The login session is saved to disk and survives the version switch.
+
+> If this breaks in the future: update Cloudron itself, then the latest CLI's browser login
+> will work via `wslview` (wslu is already installed above).
+
+### One-time: login to Docker registry + deploy
 
 ```bash
 # Fill in .env first:
 #   CLOUDRON_REGISTRY=registry.your-cloudron.example.com
-#   CLOUDRON_APP=moverview.yourdomain.com
+#   CLOUDRON_APP=moverview.yourdomain.com          # app location
 #   FIREFLY_BASE_URL=https://firefly.yourdomain.com
 #   FIREFLY_TOKEN=your-token
 
@@ -132,12 +138,12 @@ make help      # show all commands
 
 ```
 firefly-dashboard/
-├── CloudronManifest.json     # Cloudron packaging (oidc addon declared here)
+├── CloudronManifest.json     # Cloudron packaging (proxyAuth addon)
 ├── Dockerfile                # Multi-stage build
 ├── Makefile                  # All dev + deploy commands
 ├── .env.example              # Copy to .env for local dev
 ├── server/
-│   ├── index.js              # Express: OIDC auth + Firefly proxy
+│   ├── index.js              # Express: auth header + Firefly proxy
 │   └── package.json
 └── client/
     ├── src/
