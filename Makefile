@@ -74,21 +74,22 @@ release: build push ## Build + push in one step (most common command)
 deploy: ## First-time install on Cloudron
 	cloudron install \
 	  --image $(IMAGE):$(VERSION) \
-	  --location $(CLOUDRON_APP).$(CLOUDRON_HOST)
+	  --location $(CLOUDRON_APP) \
+	  --env FIREFLY_BASE_URL=$(FIREFLY_BASE_URL) FIREFLY_TOKEN=$(FIREFLY_TOKEN)
 
 .PHONY: update
 update: ## Update existing Cloudron app to latest image
 	cloudron update \
 	  --image $(IMAGE):$(VERSION) \
-	  --app $(CLOUDRON_APP).$(CLOUDRON_HOST)
+	  --app $(CLOUDRON_APP)
 
 .PHONY: logs
 logs: ## Tail logs from the running Cloudron app
-	cloudron logs -f --app $(CLOUDRON_APP).$(CLOUDRON_HOST)
+	cloudron logs -f --app $(CLOUDRON_APP)
 
 .PHONY: restart
 restart: ## Restart the Cloudron app
-	cloudron restart --app $(CLOUDRON_APP).$(CLOUDRON_HOST)
+	cloudron restart --app $(CLOUDRON_APP)
 
 # ── Util ──────────────────────────────────────────────────────────────────────
 

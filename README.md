@@ -50,11 +50,12 @@ wsl --install
 
 Restart your PC. Open **Ubuntu** from the Start menu — this is your terminal from now on.
 
-Install Node.js and make inside Ubuntu:
+Install Node.js, make, and wslu (needed to open browser from WSL) inside Ubuntu:
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install nodejs make
+sudo apt install nodejs make wslu
+sudo npm install -g cloudron@6
 ```
 
 Your Windows files are at `/mnt/c/Users/YourName/...` inside Ubuntu.
@@ -81,30 +82,34 @@ make dev
 
 ## Deploy to Cloudron
 
-### One-time setup
+### One-time: login to Cloudron CLI
+
+> **WSL note:** The latest Cloudron CLI uses browser-based login which requires
+> `wslu` (installed above). If it still fails with "does not support device flow",
+> your Cloudron version is too old for the latest CLI. Pin an older CLI version:
+> `sudo npm install -g cloudron@6`
+> Then login with username/password directly:
+> `cloudron login my.nottheend.info -u youruser -p 'yourpassword'`
+> This flag-based login is deprecated after Cloudron 9.1 — if it breaks in the future,
+> update Cloudron itself and use the browser login instead.
 
 ```bash
-# 1. Fill in .env:
-#    CLOUDRON_REGISTRY=registry.your-cloudron.example.com
-#    CLOUDRON_APP=firefly-ui
-#    CLOUDRON_HOST=your-cloudron.example.com
+cloudron login my.nottheend.info
+```
 
-make login     # login to your Cloudron registry (once per machine)
+### One-time: login to Docker registry
+
+```bash
+# Fill in .env first:
+#   CLOUDRON_REGISTRY=registry.your-cloudron.example.com
+#   CLOUDRON_APP=moverview.yourdomain.com
+#   FIREFLY_BASE_URL=https://firefly.yourdomain.com
+#   FIREFLY_TOKEN=your-token
+
+make login     # login to your Cloudron Docker registry
 make release   # build + push image
 make deploy    # install on Cloudron
 ```
-
-### Set environment variables in Cloudron
-
-After install: **Cloudron → your app → Settings → Environment Variables**
-
-| Variable | Value |
-|---|---|
-| `FIREFLY_BASE_URL` | `https://firefly.your-cloudron.example.com` |
-| `FIREFLY_TOKEN` | Firefly → Profile → OAuth → Personal Access Tokens |
-| `SESSION_SECRET` | Run `openssl rand -hex 32` and paste the result |
-
-Cloudron injects the OIDC variables automatically — you don't set those manually.
 
 ### Subsequent deploys
 

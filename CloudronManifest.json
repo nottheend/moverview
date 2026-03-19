@@ -8,29 +8,10 @@
   "healthCheckPath": "/api/health",
   "httpPort": 3000,
   "addons": {
-    "oidc": {},
+    "proxyAuth": {},
     "localstorage": {}
   },
   "manifestVersion": 2,
   "website": "https://github.com/nottheend/moverview",
-  "contactEmail": "info@nottheend.info",
-  "tags": ["finance", "firefly"],
-  "mediaLinks": [],
-  "environmentVariables": {
-    "FIREFLY_BASE_URL": {
-      "title": "Firefly-III URL",
-      "description": "Base URL of your Firefly-III instance, e.g. https://firefly.yourdomain.com",
-      "defaultValue": ""
-    },
-    "FIREFLY_TOKEN": {
-      "title": "Firefly-III API Token",
-      "description": "Personal Access Token from Firefly: Profile → OAuth → Personal Access Tokens",
-      "defaultValue": ""
-    },
-    "SESSION_SECRET": {
-      "title": "Session Secret",
-      "description": "Random secret for session encryption. Generate with: openssl rand -hex 32",
-      "defaultValue": ""
-    }
-  }
+  "contactEmail": "info@nottheend.info"
 }
