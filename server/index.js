@@ -29,7 +29,7 @@ app.use(express.json());
 const KnexSessionStore = require('connect-session-knex')(session);
 const knex = require('knex')({
   client: 'better-sqlite3',
-  connection: { filename: '/tmp/sessions.db' },
+  connection: { filename: IS_DEV ? '/tmp/sessions.db' : '/app/data/sessions.db' },
   useNullAsDefault: true,
 });
 const store = new KnexSessionStore({ knex, createtable: true });
