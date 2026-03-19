@@ -55,6 +55,7 @@ Install Node.js, make, and wslu inside Ubuntu:
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install nodejs make wslu
+sudo npm install -g cloudron
 ```
 
 Your Windows files are at `/mnt/c/Users/YourName/...` inside Ubuntu.
@@ -66,7 +67,7 @@ cp .env.example .env
 # edit .env → set FIREFLY_BASE_URL and FIREFLY_TOKEN
 
 make dev
-# open http://localhost:5173 — logged in automatically as devuser
+# open http://localhost:5173 — logged in automatically as devuser, no auth
 ```
 
 ### Picking it up again later
@@ -108,11 +109,11 @@ The login session is saved to disk and survives the version switch.
 ```bash
 # Fill in .env first:
 #   CLOUDRON_REGISTRY=registry.your-cloudron.example.com
-#   CLOUDRON_APP=moverview.yourdomain.com          # app location
+#   CLOUDRON_APP=moverview.yourdomain.com
 #   FIREFLY_BASE_URL=https://firefly.yourdomain.com
 #   FIREFLY_TOKEN=your-token
 
-make login     # login to your Cloudron Docker registry
+make login     # login to your Cloudron Docker registry (once per machine)
 make release   # build + push image
 make deploy    # install on Cloudron
 ```
@@ -120,9 +121,16 @@ make deploy    # install on Cloudron
 ### Subsequent deploys
 
 ```bash
-make release   # build + push
+# Tag a version first so the image has a clean name (not "dc4902d-dirty"):
+git add . && git commit -m "your changes"
+git tag v0.0.2   # bump this each time: v0.0.3, v0.0.4 ...
+
+make release   # build + push (image tagged as v0.0.2)
 make update    # Cloudron pulls new image
 ```
+
+> The image version comes from `git describe --tags`. If you have uncommitted changes
+> the tag gets `-dirty` appended and Cloudron can't pull it. Always commit before releasing.
 
 ### Other useful commands
 
@@ -140,6 +148,7 @@ make help      # show all commands
 firefly-dashboard/
 ├── CloudronManifest.json     # Cloudron packaging (proxyAuth addon)
 ├── Dockerfile                # Multi-stage build
+├── start.sh                  # Container entrypoint — sets NODE_ENV=production
 ├── Makefile                  # All dev + deploy commands
 ├── .env.example              # Copy to .env for local dev
 ├── server/
@@ -163,7 +172,6 @@ firefly-dashboard/
 - [ ] Charts (spending over time, category breakdown)
 - [ ] Per-user Firefly token instead of single service token
 - [ ] Mobile layout polish
-- [ ] Persistent sessions (mount `/app/data` in Cloudron)
 
 ---
 
