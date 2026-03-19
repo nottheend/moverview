@@ -1,33 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { auth } from './api.js';
-import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 
 export default function App() {
-  const [user, setUser] = useState(undefined); // undefined = loading
-  const navigate = useNavigate();
+  const [user, setUser] = useState(undefined); // undefined = still loading
 
   useEffect(() => {
     auth.me()
       .then((data) => setUser(data.user))
-      .catch(() => setUser(null));
+      .catch(() => {
+        // In production: server redirects to Cloudron login automatically.
+        // In dev: server auto-logs in, so this should never fire.
+        setUser(null);
+      });
   }, []);
-
-  async function handleLogin(username, password) {
-    const data = await auth.login(username, password);
-    setUser(data.user);
-    navigate('/');
-  }
 
   async function handleLogout() {
     await auth.logout();
-    setUser(null);
-    navigate('/login');
+    // In production, Cloudron manages the session — redirect to Cloudron logout.
+    // In dev, just reload.
+    window.location.href = '/api/auth/logout';
   }
 
   if (user === undefined) {
-    // Still checking session
     return (
       <div className="flex h-screen items-center justify-center text-gray-500">
         Loading…
@@ -35,20 +30,13 @@ export default function App() {
     );
   }
 
-  return (
-    <Routes>
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/" replace /> : <LoginPage onLogin={handleLogin} />}
-      />
-      <Route
-        path="/*"
-        element={
-          user
-            ? <DashboardPage user={user} onLogout={handleLogout} />
-            : <Navigate to="/login" replace />
-        }
-      />
-    </Routes>
-  );
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        Redirecting to login…
+      </div>
+    );
+  }
+
+  return <DashboardPage user={user} onLogout={handleLogout} />;
 }

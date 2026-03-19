@@ -1,11 +1,11 @@
 # Firefly Dashboard
 
 A custom dashboard UI for [Firefly-III](https://www.firefly-iii.org/), designed to run as a
-**packaged Cloudron app** with Cloudron SSO (LDAP) and a better permissions model than the
-default Firefly interface.
+**packaged Cloudron app** with Cloudron OIDC single sign-on.
 
 **Current state:** read-only dashboard — asset account balances + recent transactions.
-Auth via Cloudron LDAP. The Firefly API token lives only on the server, never in the browser.
+Auth via Cloudron OIDC (true SSO — users are already logged in from the Cloudron dashboard).
+The Firefly API token lives only on the server, never in the browser.
 
 ---
 
@@ -14,16 +14,27 @@ Auth via Cloudron LDAP. The Firefly API token lives only on the server, never in
 ```
 Browser → React (Vite) → Express backend → Firefly-III API
                                 ↑
-                        Cloudron LDAP auth
+                        Cloudron OIDC (SSO)
 ```
 
 | Folder | What it does |
 |---|---|
 | `client/` | React + Vite + Tailwind frontend |
-| `server/` | Node.js/Express: login (LDAP), session, Firefly proxy |
+| `server/` | Node.js/Express: OIDC auth, session, Firefly proxy |
 | `Dockerfile` | Multi-stage build → single container |
 | `CloudronManifest.json` | Tells Cloudron: port, addons, env vars |
 | `Makefile` | All commands a solo dev needs |
+
+---
+
+## Auth: how it works
+
+**In production (Cloudron):** Cloudron injects OIDC credentials automatically. Users are
+redirected to the Cloudron login page if not already logged in — our app never sees their
+password. True SSO: if already logged into Cloudron, they go straight to the dashboard.
+
+**In local dev:** OIDC is skipped entirely. The server auto-logs you in as `devuser` so
+you go straight to the dashboard with no login screen. Just `make dev` and open the browser.
 
 ---
 
@@ -31,22 +42,22 @@ Browser → React (Vite) → Express backend → Firefly-III API
 
 ### Windows setup (one-time)
 
-Windows requires WSL (Windows Subsystem for Linux). Open **PowerShell** and run:
+Open **PowerShell** and run:
 
 ```powershell
 wsl --install
 ```
 
-Restart your PC. Then open **Ubuntu** from the Start menu — this is your terminal from now on.
+Restart your PC. Open **Ubuntu** from the Start menu — this is your terminal from now on.
 
-Install Node.js inside Ubuntu:
+Install Node.js and make inside Ubuntu:
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install nodejs make
 ```
 
-Your Windows files are accessible at `/mnt/c/Users/YourName/...` inside Ubuntu.
+Your Windows files are at `/mnt/c/Users/YourName/...` inside Ubuntu.
 
 ### Start developing
 
@@ -55,17 +66,14 @@ cp .env.example .env
 # edit .env → set FIREFLY_BASE_URL and FIREFLY_TOKEN
 
 make dev
-# backend → http://localhost:3000
-# frontend → http://localhost:5173  (hot reload, open this in your browser)
+# open http://localhost:5173 — you are logged in automatically as devuser
 ```
-
-In dev mode LDAP is skipped — any non-empty username + password works.
-The Vite dev server proxies all `/api/*` calls to the Express backend automatically.
 
 ### Picking it up again later
 
 ```bash
-# Open Ubuntu from Start menu, navigate to project, then:
+# Open Ubuntu from Start menu, navigate to project:
+cd /mnt/c/Users/YourName/path/to/firefly-dashboard
 make dev
 ```
 
@@ -76,30 +84,29 @@ make dev
 ### One-time setup
 
 ```bash
-# 1. Point to your Cloudron registry in .env:
+# 1. Fill in .env:
 #    CLOUDRON_REGISTRY=registry.your-cloudron.example.com
 #    CLOUDRON_APP=firefly-ui
 #    CLOUDRON_HOST=your-cloudron.example.com
 
-# 2. Login to the registry (once per machine):
-make login
-
-# 3. Build + push + install:
-make release
-make deploy
+make login     # login to your Cloudron registry (once per machine)
+make release   # build + push image
+make deploy    # install on Cloudron
 ```
 
 ### Set environment variables in Cloudron
 
-After install go to: **Cloudron → your app → Settings → Environment Variables**
+After install: **Cloudron → your app → Settings → Environment Variables**
 
 | Variable | Value |
 |---|---|
 | `FIREFLY_BASE_URL` | `https://firefly.your-cloudron.example.com` |
-| `FIREFLY_TOKEN` | Personal Access Token from Firefly → Profile → OAuth |
-| `SESSION_SECRET` | Random string — run `openssl rand -hex 32` |
+| `FIREFLY_TOKEN` | Firefly → Profile → OAuth → Personal Access Tokens |
+| `SESSION_SECRET` | Run `openssl rand -hex 32` and paste the result |
 
-### Subsequent deploys (after code changes)
+Cloudron injects the OIDC variables automatically — you don't set those manually.
+
+### Subsequent deploys
 
 ```bash
 make release   # build + push
@@ -110,7 +117,7 @@ make update    # Cloudron pulls new image
 
 ```bash
 make logs      # tail live app logs
-make restart   # restart app without rebuild
+make restart   # restart without rebuild
 make help      # show all commands
 ```
 
@@ -120,19 +127,18 @@ make help      # show all commands
 
 ```
 firefly-dashboard/
-├── CloudronManifest.json     # Cloudron packaging config
+├── CloudronManifest.json     # Cloudron packaging (oidc addon declared here)
 ├── Dockerfile                # Multi-stage build
 ├── Makefile                  # All dev + deploy commands
 ├── .env.example              # Copy to .env for local dev
 ├── server/
-│   ├── index.js              # Express: auth + Firefly proxy
+│   ├── index.js              # Express: OIDC auth + Firefly proxy
 │   └── package.json
 └── client/
     ├── src/
-    │   ├── App.jsx           # Routing + auth guard
+    │   ├── App.jsx           # Auth state + routing
     │   ├── api.js            # All fetch calls (auth + firefly.*)
     │   └── pages/
-    │       ├── LoginPage.jsx
     │       └── DashboardPage.jsx
     └── vite.config.js        # Dev proxy → :3000
 ```
@@ -155,4 +161,4 @@ firefly-dashboard/
 Full API docs: https://api-docs.firefly-iii.org/
 
 The backend proxies `GET /api/firefly/*` → `FIREFLY_BASE_URL/api/v1/*`
-To add a new data source: add a method in `client/src/api.js` — that's it.
+To add a new endpoint: add a method to `client/src/api.js` — that's it.

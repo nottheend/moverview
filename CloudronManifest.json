@@ -8,7 +8,7 @@
   "healthCheckPath": "/api/health",
   "httpPort": 3000,
   "addons": {
-    "ldap": {}
+    "oidc": {}
   },
   "manifestVersion": 2,
   "minBoxVersion": "7.0.0",
@@ -18,11 +18,11 @@
       "value": ""
     },
     "FIREFLY_TOKEN": {
-      "description": "Firefly-III Personal Access Token (create one in Firefly under Profile → OAuth)",
+      "description": "Firefly-III Personal Access Token (Firefly → Profile → OAuth → Personal Access Tokens)",
       "value": ""
     },
     "SESSION_SECRET": {
-      "description": "Random secret string for session encryption (generate with: openssl rand -hex 32)",
+      "description": "Random secret for session encryption — generate with: openssl rand -hex 32",
       "value": ""
     }
   }

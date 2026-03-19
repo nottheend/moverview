@@ -1,19 +1,19 @@
 {
   "name": "firefly-dashboard-server",
   "version": "0.0.1",
-  "description": "Backend for Firefly Dashboard — handles Cloudron LDAP auth and proxies Firefly-III API",
+  "description": "Backend for Firefly Dashboard — Cloudron OIDC auth and Firefly-III proxy",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
   "dependencies": {
+    "better-sqlite3": "^9.4.0",
     "connect-session-knex": "^3.0.1",
     "express": "^4.19.0",
     "express-session": "^1.18.0",
     "knex": "^3.1.0",
-    "ldapauth-fork": "^5.0.5",
     "node-fetch": "^2.7.0",
-    "better-sqlite3": "^9.4.0"
+    "openid-client": "^5.6.5"
   }
 }
