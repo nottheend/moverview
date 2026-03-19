@@ -1,0 +1,29 @@
+{
+  "id": "io.example.fireflyui",
+  "title": "Firefly Dashboard",
+  "author": "Your Name <you@example.com>",
+  "description": "Custom dashboard UI for Firefly-III",
+  "tagline": "A cleaner Firefly-III interface with Cloudron SSO",
+  "version": "0.0.1",
+  "healthCheckPath": "/api/health",
+  "httpPort": 3000,
+  "addons": {
+    "ldap": {}
+  },
+  "manifestVersion": 2,
+  "minBoxVersion": "7.0.0",
+  "environmentVariables": {
+    "FIREFLY_BASE_URL": {
+      "description": "Base URL of your Firefly-III instance, e.g. https://firefly.yourdomain.com",
+      "value": ""
+    },
+    "FIREFLY_TOKEN": {
+      "description": "Firefly-III Personal Access Token (create one in Firefly under Profile → OAuth)",
+      "value": ""
+    },
+    "SESSION_SECRET": {
+      "description": "Random secret string for session encryption (generate with: openssl rand -hex 32)",
+      "value": ""
+    }
+  }
+}
