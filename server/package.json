@@ -8,11 +8,7 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.0",
-    "connect-session-knex": "^3.0.1",
     "express": "^4.19.0",
-    "express-session": "^1.18.0",
-    "knex": "^3.1.0",
     "node-fetch": "^2.7.0"
   }
 }

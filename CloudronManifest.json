@@ -3,8 +3,7 @@
   "healthCheckPath": "/api/health",
   "httpPort": 3000,
   "addons": {
-    "proxyAuth": {},
-    "localstorage": {}
+    "proxyAuth": {}
   },
   "manifestVersion": 2
 }
