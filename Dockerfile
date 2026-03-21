@@ -1,5 +1,5 @@
 # ── Stage 1: build the React client ──────────────────────────────────────────
-FROM node:20-alpine AS client-builder
+FROM node:22-alpine AS client-builder
 
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
@@ -11,7 +11,7 @@ COPY client/ ./
 RUN npm run build
 
 # ── Stage 2: production image ─────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
