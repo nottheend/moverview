@@ -348,7 +348,8 @@ export default function DashboardPage({ user, onLogout }) {
             {filtered.length}{filtered.length !== transactions.length ? ` / ${transactions.length}` : ''} tx
           </span>
         </div>
-        <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-4">
+        <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
+        <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
           Sign out
         </button>
       </header>
