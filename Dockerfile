@@ -1,8 +1,8 @@
 # ── Stage 1: build the React client ──────────────────────────────────────────
 FROM node:20-alpine AS client-builder
 
-# git for version, librsvg for SVG→PNG conversion
-RUN apk add --no-cache git librsvg
+# git needed for version detection at build time
+RUN apk add --no-cache git
 
 WORKDIR /build/client
 COPY client/package*.json ./
@@ -26,11 +26,8 @@ COPY --from=client-builder /build/client/dist ./client/dist
 COPY start.sh ./
 RUN chmod +x start.sh
 
-# Convert SVG icon to PNG for Cloudron
+# icon.svg is used by CloudronManifest.json — no conversion needed, Cloudron accepts SVG
 COPY icon.svg ./
-RUN apk add --no-cache librsvg && \
-    rsvg-convert -w 512 -h 512 icon.svg -o icon.png && \
-    apk del librsvg
 
 EXPOSE 3000
 CMD ["./start.sh"]
