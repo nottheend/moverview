@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MOverview</title>
+    <!-- icon.svg is the single source for all icons:
+         - Cloudron app tile:  root/icon.svg (via CloudronManifest.json "file://icon.svg")
+         - Browser favicon:    /icon.svg (served from client/public/ in dev, client/dist/ in prod)
+         - Nav logo:           <img src="/icon.svg"> in DashboardPage.jsx
+         To change the icon: edit root/icon.svg, then run: cp icon.svg client/public/icon.svg -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   </head>
   <body class="antialiased">

@@ -24,13 +24,17 @@ export const firefly = {
   accounts: (type = 'asset', page = 1) =>
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
-  // Fetch a single page of 50 transactions from Firefly.
-  // Returns { data, hasMore } where hasMore = true if there may be more pages.
   transactionPage: async (page = 1) => {
     const res = await request(`/api/firefly/transactions?page=${page}&limit=50&type=default`);
     const data = res.data || [];
-    const total = res.meta?.pagination?.total || 0;
-    const hasMore = page * 50 < total;
-    return { data, hasMore, total };
+
+    // Firefly returns pagination in res.meta.pagination
+    // Fall back to "got a full page = probably more" if meta is missing
+    const pagination = res.meta?.pagination;
+    const hasMore = pagination
+      ? page < pagination.total_pages
+      : data.length === 50;
+
+    return { data, hasMore };
   },
 };

@@ -26,8 +26,11 @@ COPY --from=client-builder /build/client/dist ./client/dist
 COPY start.sh ./
 RUN chmod +x start.sh
 
-# icon.svg is used by CloudronManifest.json — no conversion needed, Cloudron accepts SVG
+# icon.svg — single source for Cloudron tile, browser favicon, and nav logo
+# Root copy: used by CloudronManifest.json ("file://icon.svg")
+# client/dist copy: served at /icon.svg by Express for the browser
 COPY icon.svg ./
+COPY icon.svg ./client/dist/icon.svg
 
 EXPOSE 3000
 CMD ["./start.sh"]

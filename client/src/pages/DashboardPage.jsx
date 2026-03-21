@@ -270,6 +270,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [hasMore,      setHasMore]      = useState(false);
   const [fireflyPage,  setFireflyPage]  = useState(1);
   const [error,        setError]        = useState('');
+  // totalLoaded tracks how many tx have been fetched from Firefly across all pages
 
   const [filterCategory,   setFilterCategory]   = useState(null);
   const [filterBudget,     setFilterBudget]      = useState(null);
@@ -385,10 +386,10 @@ export default function DashboardPage({ user, onLogout }) {
             <circle cx="562" cy="340" r="68" fill="#1c1c2e"/>
             <circle cx="562" cy="340" r="44" fill="#c9a84c"/>
           </svg>
-          <span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
+          <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
-            {loading ? 'Loading…' : loadingMore ? `${transactions.length} tx — loading more…` : `${transactions.length} tx loaded`}
+            {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
             {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
           </span>
         </div>
@@ -472,7 +473,7 @@ export default function DashboardPage({ user, onLogout }) {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {(totalPages > 1 || hasMore) && (
                 <div className="flex items-center justify-between mt-4 px-4 sm:px-0">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                     className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -ml-3">
@@ -486,11 +487,19 @@ export default function DashboardPage({ user, onLogout }) {
                         {p}
                       </button>
                     ))}
+                    {hasMore && <span className="w-8 h-8 flex items-center justify-center text-stone-300 text-xs">…</span>}
                   </div>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                    className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -mr-3">
-                    Weiter →
-                  </button>
+                  {page === totalPages && hasMore ? (
+                    <button onClick={loadMore} disabled={loadingMore}
+                      className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -mr-3">
+                      {loadingMore ? 'Loading…' : 'Weiter →'}
+                    </button>
+                  ) : (
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages && !hasMore}
+                      className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -mr-3">
+                      Weiter →
+                    </button>
+                  )}
                 </div>
               )}
             </section>
