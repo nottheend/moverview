@@ -343,7 +343,17 @@ export default function DashboardPage({ user, onLogout }) {
       {/* Nav */}
       <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-stone-800 font-semibold tracking-tight shrink-0">Moverview</span>
+          <svg width="22" height="22" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+            <rect width="680" height="680" rx="120" fill="#1c1c2e"/>
+            <circle cx="118" cy="340" r="88" fill="#c9a84c"/>
+            <circle cx="118" cy="340" r="68" fill="#1c1c2e"/>
+            <circle cx="118" cy="340" r="44" fill="#c9a84c"/>
+            <text x="340" y="400" textAnchor="middle" fontFamily="Georgia,serif" fontSize="260" fontWeight="700" fill="#c9a84c">M</text>
+            <circle cx="562" cy="340" r="88" fill="#c9a84c"/>
+            <circle cx="562" cy="340" r="68" fill="#1c1c2e"/>
+            <circle cx="562" cy="340" r="44" fill="#c9a84c"/>
+          </svg>
+          <span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
             {filtered.length}{filtered.length !== transactions.length ? ` / ${transactions.length}` : ''} tx
