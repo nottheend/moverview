@@ -1,14 +1,12 @@
 # ── Stage 1: build the React client ──────────────────────────────────────────
 FROM node:20-alpine AS client-builder
 
-# git needed for version detection at build time
-RUN apk add --no-cache git
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 
 WORKDIR /build/client
 COPY client/package*.json ./
 RUN npm ci
-
-COPY .git /build/.git
 COPY client/ ./
 RUN npm run build
 
@@ -27,8 +25,6 @@ COPY start.sh ./
 RUN chmod +x start.sh
 
 # icon.svg — single source for Cloudron tile, browser favicon, and nav logo
-# Root copy: used by CloudronManifest.json ("file://icon.svg")
-# client/dist copy: served at /icon.svg by Express for the browser
 COPY icon.svg ./
 COPY icon.svg ./client/dist/icon.svg
 

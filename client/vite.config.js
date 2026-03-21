@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 import { execSync } from 'child_process';
 
 const version = (() => {
+  // In Docker: APP_VERSION is injected as a build arg
+  if (process.env.APP_VERSION && process.env.APP_VERSION !== 'dev') {
+    return process.env.APP_VERSION;
+  }
+  // In local dev: read from git directly
   try {
     return execSync('git describe --tags --always --dirty', { encoding: 'utf8' }).trim();
   } catch {

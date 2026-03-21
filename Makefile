@@ -56,7 +56,7 @@ login: ## Login to your Cloudron's Docker registry (do this once per machine)
 
 .PHONY: build
 build: ## Build Docker image locally
-	docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
+	docker build --build-arg APP_VERSION=$(VERSION) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
 	@echo "Built: $(IMAGE):$(VERSION)"
 
 .PHONY: push
