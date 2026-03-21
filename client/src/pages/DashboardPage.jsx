@@ -273,6 +273,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [filterTag,        setFilterTag]         = useState(null);
   const [filterDestination,setFilterDestination] = useState(null);
   const [page,             setPage]              = useState(1);
+  const [accountsOpen,    setAccountsOpen]      = useState(false);
 
   // Detect mobile (< 768px) — re-checked on resize
   const [mobile, setMobile] = useState(() => window.innerWidth < 768);
@@ -451,34 +452,45 @@ export default function DashboardPage({ user, onLogout }) {
               )}
             </section>
 
-            {/* ── Accounts ── */}
+            {/* ── Accounts (collapsible) ── */}
             <section>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-2 px-4 sm:px-0">
-                Konten
-              </h2>
-              <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
-                {mobile ? (
-                  accounts.map(a => <AccountRow key={a.id} account={a} mobile={true} />)
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-stone-200 bg-stone-50">
-                        {['Account', 'Type', 'Number', 'Balance'].map(h => (
-                          <th key={h} className={`py-2 pr-4 ${h === 'Account' ? 'pl-4' : ''} text-xs font-semibold text-stone-400 uppercase tracking-wide ${h === 'Balance' ? 'text-right' : 'text-left'}`}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accounts.map(a => <AccountRow key={a.id} account={a} mobile={false} />)}
-                    </tbody>
-                  </table>
-                )}
-                {accounts.length === 0 && (
-                  <p className="py-12 text-center text-stone-300 text-sm">No accounts found.</p>
-                )}
-              </div>
+              <button
+                onClick={() => setAccountsOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group"
+              >
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
+                  Konten
+                </h2>
+                <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
+                  {accountsOpen ? '▲' : '▼'}
+                </span>
+              </button>
+
+              {accountsOpen && (
+                <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+                  {mobile ? (
+                    accounts.map(a => <AccountRow key={a.id} account={a} mobile={true} />)
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-stone-200 bg-stone-50">
+                          {['Account', 'Type', 'Number', 'Balance'].map(h => (
+                            <th key={h} className={`py-2 pr-4 ${h === 'Account' ? 'pl-4' : ''} text-xs font-semibold text-stone-400 uppercase tracking-wide ${h === 'Balance' ? 'text-right' : 'text-left'}`}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {accounts.map(a => <AccountRow key={a.id} account={a} mobile={false} />)}
+                      </tbody>
+                    </table>
+                  )}
+                  {accounts.length === 0 && (
+                    <p className="py-12 text-center text-stone-300 text-sm">No accounts found.</p>
+                  )}
+                </div>
+              )}
             </section>
           </>
         )}
