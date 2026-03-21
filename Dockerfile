@@ -4,6 +4,8 @@ FROM node:22-alpine AS client-builder
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
+RUN npm install -g npm@latest
+
 WORKDIR /build/client
 COPY client/package*.json ./
 RUN npm ci
