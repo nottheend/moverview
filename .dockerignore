@@ -3,4 +3,4 @@ client/node_modules
 client/dist
 */node_modules
 *.log
-.git
+# .git is intentionally NOT ignored — needed in stage 1 for git describe (version)

@@ -1,9 +1,16 @@
 # ── Stage 1: build the React client ──────────────────────────────────────────
 FROM node:20-alpine AS client-builder
 
+# git is needed so vite.config.js can run "git describe --tags" for the version
+RUN apk add --no-cache git
+
 WORKDIR /build/client
 COPY client/package*.json ./
 RUN npm ci
+
+# Copy .git so git describe can read the tag
+COPY .git /build/.git
+
 COPY client/ ./
 RUN npm run build
 
