@@ -266,6 +266,9 @@ export default function DashboardPage({ user, onLogout }) {
   const [accounts,     setAccounts]     = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading,      setLoading]      = useState(true);
+  const [loadingMore,  setLoadingMore]  = useState(false);
+  const [hasMore,      setHasMore]      = useState(false);
+  const [fireflyPage,  setFireflyPage]  = useState(1);
   const [error,        setError]        = useState('');
 
   const [filterCategory,   setFilterCategory]   = useState(null);
@@ -286,12 +289,14 @@ export default function DashboardPage({ user, onLogout }) {
   useEffect(() => {
     async function load() {
       try {
-        const [acctRes, txList] = await Promise.all([
+        const [acctRes, txRes] = await Promise.all([
           firefly.accounts('asset'),
-          firefly.transactions(),
+          firefly.transactionPage(1),
         ]);
         setAccounts(acctRes.data || []);
-        setTransactions(txList);
+        setTransactions(dedupe(txRes.data));
+        setHasMore(txRes.hasMore);
+        setFireflyPage(1);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -300,6 +305,33 @@ export default function DashboardPage({ user, onLogout }) {
     }
     load();
   }, []);
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = fireflyPage + 1;
+      const txRes = await firefly.transactionPage(nextPage);
+      setTransactions(prev => dedupe([...prev, ...txRes.data]));
+      setHasMore(txRes.hasMore);
+      setFireflyPage(nextPage);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  function dedupe(txs) {
+    const seen = new Set();
+    return txs
+      .filter(tx => { if (seen.has(tx.id)) return false; seen.add(tx.id); return true; })
+      .sort((a, b) => {
+        const da = new Date(a.attributes?.transactions?.[0]?.date || 0);
+        const db = new Date(b.attributes?.transactions?.[0]?.date || 0);
+        return db - da;
+      });
+  }
 
   function applyFilter(setter, value) {
     setter(value);
@@ -356,7 +388,8 @@ export default function DashboardPage({ user, onLogout }) {
           <span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
-            {filtered.length}{filtered.length !== transactions.length ? ` / ${transactions.length}` : ''} tx
+            {loading ? 'Loading…' : loadingMore ? `${transactions.length} tx — loading more…` : `${transactions.length} tx loaded`}
+            {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
           </span>
         </div>
         <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
