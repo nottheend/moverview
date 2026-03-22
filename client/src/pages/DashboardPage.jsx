@@ -491,7 +491,11 @@ export default function DashboardPage({ user, onLogout }) {
                 <div className="hidden sm:flex items-center gap-2">
                   <span className="inline-flex items-center text-xs bg-white text-stone-600 px-2 py-0.5 rounded border border-stone-400 tracking-tight">account</span>
                   <span className="inline-flex items-center text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full border border-stone-200">budget</span>
-                  <span className="inline-flex items-center text-xs bg-white text-stone-500 px-2 py-0.5 rounded border border-stone-400" style={{position:'relative',paddingLeft:10,paddingRight:10}}>bill</span>
+                  <span className="inline-flex items-center text-xs bg-white text-stone-500 border border-stone-400 rounded" style={{position:'relative',paddingLeft:12,paddingRight:12,paddingTop:2,paddingBottom:2}}>
+                    <span style={{position:'absolute',left:-5,top:'50%',transform:'translateY(-50%)',width:9,height:9,borderRadius:'50%',background:'#fafaf9',border:'1px solid #a8a29e',boxSizing:'border-box'}} />
+                    bill
+                    <span style={{position:'absolute',right:-5,top:'50%',transform:'translateY(-50%)',width:9,height:9,borderRadius:'50%',background:'#fafaf9',border:'1px solid #a8a29e',boxSizing:'border-box'}} />
+                  </span>
                   <span className="inline-flex items-center text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-sm border-l-2 border-blue-300 font-medium">category</span>
                   <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-r-full border-l-2" style={{background:'#faf8f2',color:'#b8a06a',borderColor:'#ddd0a8'}}>
                     <span style={{width:5,height:5,borderRadius:'50%',background:'#b8a06a',display:'inline-block'}} />tag
