@@ -34,15 +34,78 @@ function txType(split) {
 const CHIP = {
   cat:     'inline-flex items-center text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-sm border-l-2 border-blue-300 font-medium hover:bg-blue-100 transition-colors cursor-pointer',
   budget:  'inline-flex items-center text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full border border-stone-200 hover:bg-stone-200 transition-colors cursor-pointer',
-  tag:     'inline-flex items-center gap-1 text-xs bg-pink-50 text-pink-700 pl-1.5 pr-2.5 py-0.5 rounded-r-full border-l-2 border-pink-300 hover:bg-pink-100 transition-colors cursor-pointer',
-  account: 'text-xs text-stone-400 hover:text-stone-600 transition-colors cursor-pointer',
+  tag:     'inline-flex items-center gap-1 text-xs bg-[#faf8f2] text-[#b8a06a] pl-1.5 pr-2.5 py-0.5 rounded-r-full border-l-2 border-[#ddd0a8] hover:bg-amber-50 transition-colors cursor-pointer',
+  account: 'inline-flex items-center text-xs bg-white text-stone-600 px-2 py-0.5 rounded border border-stone-400 hover:bg-stone-50 transition-colors cursor-pointer tracking-tight',
+  accountArrow: 'text-xs text-stone-400',
+  bill:    'inline-flex items-center text-xs text-stone-500 px-2 py-0.5 cursor-pointer hover:text-stone-800 transition-colors',
 };
 
 function TagDot() {
-  return <span style={{width:5,height:5,borderRadius:'50%',background:'#f472b6',flexShrink:0,display:'inline-block'}} />;
+  return <span style={{width:5,height:5,borderRadius:'50%',background:'#b8a06a',flexShrink:0,display:'inline-block'}} />;
 }
 
-function groupByDate(transactions) {
+// ── Bill chip — ticket style ──────────────────────────────────────────────────
+
+function BillChip({ name, onClick }) {
+  return (
+    <button onClick={onClick} className={CHIP.bill} style={{
+      background: '#fff',
+      border: '1px solid #a8a29e',
+      borderRadius: 3,
+      position: 'relative',
+      paddingLeft: 10,
+      paddingRight: 10,
+    }}>
+      {/* left notch */}
+      <span style={{
+        position: 'absolute', left: -5, top: '50%', transform: 'translateY(-50%)',
+        width: 9, height: 9, borderRadius: '50%',
+        background: '#fafaf9', border: '1px solid #a8a29e',
+        boxSizing: 'border-box',
+      }} />
+      🧾 {name}
+      {/* right notch */}
+      <span style={{
+        position: 'absolute', right: -5, top: '50%', transform: 'translateY(-50%)',
+        width: 9, height: 9, borderRadius: '50%',
+        background: '#fafaf9', border: '1px solid #a8a29e',
+        boxSizing: 'border-box',
+      }} />
+    </button>
+  );
+}
+
+// ── Bill row (collapsible section) ────────────────────────────────────────────
+
+function BillRow({ bill, isActive, onClick }) {
+  const attr = bill.attributes || {};
+  const isPaid = attr.paid_dates?.length > 0;
+  const nextDue = attr.next_expected_match;
+  const amount = attr.amount_min === attr.amount_max
+    ? fmt(attr.amount_min, attr.currency_symbol)
+    : `${fmt(attr.amount_min, attr.currency_symbol)}–${fmt(attr.amount_max, attr.currency_symbol)}`;
+
+  const overdue = nextDue && new Date(nextDue) < new Date() && !isPaid;
+
+  return (
+    <button onClick={onClick} className={`w-full flex items-center justify-between px-4 py-2.5 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors text-left ${isActive ? 'bg-stone-50' : ''}`}>
+      <div className="flex items-center gap-2">
+        {/* ticket icon */}
+        <span className="text-stone-300 text-xs">🧾</span>
+        <span className={`text-sm ${isActive ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{attr.name}</span>
+        <span className={`text-xs px-1.5 py-0.5 rounded-full ${isPaid ? 'bg-emerald-50 text-emerald-600' : overdue ? 'bg-red-50 text-red-500' : 'bg-stone-100 text-stone-400'}`}>
+          {isPaid ? 'paid' : overdue ? 'overdue' : 'unpaid'}
+        </span>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm tabular-nums text-stone-600">{amount}</p>
+        {nextDue && <p className="text-xs text-stone-400 mt-0.5">{fmtDate(nextDue)}</p>}
+      </div>
+    </button>
+  );
+}
+
+
   const groups = {};
   for (const tx of transactions) {
     const split = tx.attributes?.transactions?.[0] || {};
@@ -82,22 +145,23 @@ function FilterLink({ value, onClick, className = '' }) {
 
 // ── Mobile transaction card ───────────────────────────────────────────────────
 
-function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterTag, onFilterDestination }) {
+// Unified card for both mobile and desktop (no table layout)
+function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterBill, onFilterTag, onFilterDestination }) {
   const split      = tx.attributes?.transactions?.[0] || {};
   const type       = txType(split);
   const isExpense  = type === 'expense';
   const isTransfer = type === 'transfer';
   const tags       = split.tags || [];
 
-  const destination = isTransfer
-    ? split.destination_name
-    : isExpense ? split.destination_name : split.source_name;
+  const source      = split.source_name;
+  const destination = split.destination_name;
+  const flowArrow   = isTransfer ? '⇄' : '→';
 
   const amountColor = isExpense ? 'text-red-600' : isTransfer ? 'text-indigo-600' : 'text-emerald-700';
   const typeLabel   = isExpense ? 'Expense' : isTransfer ? 'Transfer' : 'Income';
 
   return (
-    <div className="border-b border-stone-100 px-4 py-3">
+    <div className="border-b border-stone-100 px-4 py-3 hover:bg-stone-50 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-stone-800 font-medium leading-snug flex-1 pt-0.5">{split.description || '—'}</p>
         <div className="text-right shrink-0">
@@ -108,62 +172,28 @@ function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterTag, on
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5 mt-2">
-        {split.category_name && <button onClick={() => onFilterCategory(split.category_name)} className={CHIP.cat}>{split.category_name}</button>}
+        {(source || destination) && (
+          <span className="inline-flex items-center gap-1">
+            {source      && <button onClick={() => onFilterDestination(source)}      className={CHIP.account}>{source}</button>}
+            {source && destination && <span className={CHIP.accountArrow}>{flowArrow}</span>}
+            {destination && <button onClick={() => onFilterDestination(destination)} className={CHIP.account}>{destination}</button>}
+          </span>
+        )}
         {split.budget_name   && <button onClick={() => onFilterBudget(split.budget_name)}     className={CHIP.budget}>{split.budget_name}</button>}
+        {split.bill_name     && <BillChip name={split.bill_name} onClick={() => onFilterBill(split.bill_name)} />}
+        {split.category_name && <button onClick={() => onFilterCategory(split.category_name)} className={CHIP.cat}>{split.category_name}</button>}
         {tags.map(tag => <button key={tag} onClick={() => onFilterTag(tag)} className={CHIP.tag}><TagDot />{tag}</button>)}
-        {destination && <button onClick={() => onFilterDestination(destination)} className={CHIP.account}>→ {destination}</button>}
       </div>
     </div>
   );
 }
 
-// ── Desktop transaction row ───────────────────────────────────────────────────
-
-function TransactionRow({ tx, onFilterCategory, onFilterBudget, onFilterTag, onFilterDestination }) {
-  const split      = tx.attributes?.transactions?.[0] || {};
-  const type       = txType(split);
-  const isExpense  = type === 'expense';
-  const isTransfer = type === 'transfer';
-  const tags       = split.tags || [];
-
-  const destination = isTransfer
-    ? split.destination_name
-    : isExpense ? split.destination_name : null;
-
-  const amountColor = isExpense ? 'text-red-600' : isTransfer ? 'text-indigo-600' : 'text-emerald-700';
-  const typeLabel   = isExpense ? 'Expense' : isTransfer ? 'Transfer' : 'Income';
-
-  return (
-    <tr className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-      {/* Description + chips */}
-      <td className="py-2.5 pr-3 pl-4">
-        <p className="text-sm text-stone-800">{split.description || '—'}</p>
-        <div className="flex gap-1 mt-1 flex-wrap">
-          {split.category_name && <button onClick={() => onFilterCategory(split.category_name)} className={CHIP.cat}>{split.category_name}</button>}
-          {split.budget_name   && <button onClick={() => onFilterBudget(split.budget_name)}     className={CHIP.budget}>{split.budget_name}</button>}
-          {tags.map(tag => <button key={tag} onClick={() => onFilterTag(tag)} className={CHIP.tag}><TagDot />{tag}</button>)}
-        </div>
-      </td>
-      {/* Source */}
-      <td className="py-2.5 pr-3 text-sm text-stone-400 whitespace-nowrap">
-        {isExpense ? split.source_name : isTransfer ? split.source_name : split.destination_name}
-      </td>
-      {/* Destination */}
-      <td className="py-2.5 pr-3 text-sm whitespace-nowrap">
-        <FilterLink value={destination} onClick={onFilterDestination} className="text-stone-400" />
-      </td>
-      {/* Amount + type */}
-      <td className="py-2.5 pr-4 text-right whitespace-nowrap tabular-nums">
-        <p className={`text-sm font-semibold ${amountColor}`}>{isExpense ? '−' : isTransfer ? '⇄' : '+'} {fmt(split.amount, split.currency_symbol)}</p>
-        <p className={`text-xs uppercase tracking-wide mt-0.5 ${amountColor}`} style={{opacity:0.7}}>{typeLabel}</p>
-      </td>
-    </tr>
-  );
-}
+// Alias — desktop now uses the same card layout
+const TransactionRow = TransactionCard;
 
 // ── Date group ────────────────────────────────────────────────────────────────
 
-function DateGroup({ date, transactions, mobile, onFilterCategory, onFilterBudget, onFilterTag, onFilterDestination }) {
+function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFilterTag, onFilterDestination }) {
   const net = transactions.reduce((sum, tx) => {
     const split  = tx.attributes?.transactions?.[0] || {};
     const type   = txType(split);
@@ -173,39 +203,16 @@ function DateGroup({ date, transactions, mobile, onFilterCategory, onFilterBudge
     return sum;
   }, 0);
 
-  const dateLabel = mobile ? fmtDateShort(date) : fmtDate(date);
-
-  if (mobile) {
-    return (
-      <>
-        <div className="flex items-center justify-between px-4 py-1.5 bg-stone-50 border-b border-stone-200">
-          <span className="text-xs font-semibold text-stone-400 uppercase tracking-widest">{dateLabel}</span>
-          <span className={`text-xs font-semibold tabular-nums ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-            {net >= 0 ? '+' : '−'} {fmt(Math.abs(net))}
-          </span>
-        </div>
-        {transactions.map(tx => (
-          <TransactionCard key={tx.id} tx={tx}
-            onFilterCategory={onFilterCategory} onFilterBudget={onFilterBudget}
-            onFilterTag={onFilterTag} onFilterDestination={onFilterDestination} />
-        ))}
-      </>
-    );
-  }
-
   return (
     <>
-      <tr className="bg-stone-50 border-b border-stone-200">
-        <td colSpan={5} className="py-1.5 pl-4">
-          <span className="text-xs font-semibold text-stone-400 uppercase tracking-widest">{dateLabel}</span>
-        </td>
-        <td className={`py-1.5 pr-4 text-xs font-semibold text-right tabular-nums
-          ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+      <div className="flex items-center justify-between px-4 py-1.5 bg-stone-50 border-b border-stone-200">
+        <span className="text-xs font-semibold text-stone-400 uppercase tracking-widest">{fmtDate(date)}</span>
+        <span className={`text-xs font-semibold tabular-nums ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
           {net >= 0 ? '+' : '−'} {fmt(Math.abs(net))}
-        </td>
-      </tr>
+        </span>
+      </div>
       {transactions.map(tx => (
-        <TransactionRow key={tx.id} tx={tx}
+        <TransactionCard key={tx.id} tx={tx}
           onFilterCategory={onFilterCategory} onFilterBudget={onFilterBudget}
           onFilterTag={onFilterTag} onFilterDestination={onFilterDestination} />
       ))}
@@ -251,6 +258,7 @@ function AccountRow({ account, mobile }) {
 export default function DashboardPage({ user, onLogout }) {
   const [accounts,     setAccounts]     = useState([]);
   const [budgets,      setBudgets]      = useState([]);
+  const [bills,        setBills]        = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [loadingMore,  setLoadingMore]  = useState(false);
@@ -260,11 +268,13 @@ export default function DashboardPage({ user, onLogout }) {
 
   const [filterCategory,   setFilterCategory]   = useState(null);
   const [filterBudget,     setFilterBudget]      = useState(null);
+  const [filterBill,       setFilterBill]        = useState(null);
   const [filterTag,        setFilterTag]         = useState(null);
   const [filterDestination,setFilterDestination] = useState(null);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
   const [categoriesOpen,   setCategoriesOpen]   = useState(false);
+  const [billsOpen,        setBillsOpen]        = useState(false);
   const [tagsOpen,         setTagsOpen]         = useState(false);
 
   // Detect mobile (< 768px) — re-checked on resize
@@ -278,16 +288,18 @@ export default function DashboardPage({ user, onLogout }) {
   useEffect(() => {
     async function load() {
       try {
-        const [acctRes, txRes, budgetList] = await Promise.all([
+        const [acctRes, txRes, budgetList, billList] = await Promise.all([
           firefly.accounts('asset'),
           firefly.transactionPage(1),
           firefly.budgets(),
+          firefly.bills(),
         ]);
         setAccounts(acctRes.data || []);
         setTransactions(dedupe(txRes.data));
         setHasMore(txRes.hasMore);
         setFireflyPage(1);
         setBudgets(budgetList);
+        setBills(billList);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -330,7 +342,7 @@ export default function DashboardPage({ user, onLogout }) {
   }
 
   function clearAll() {
-    setFilterCategory(null); setFilterBudget(null);
+    setFilterCategory(null); setFilterBudget(null); setFilterBill(null);
     setFilterTag(null); setFilterDestination(null);
     setPage(1);
   }
@@ -341,17 +353,18 @@ export default function DashboardPage({ user, onLogout }) {
     const dest  = type === 'transfer' || type === 'expense' ? split.destination_name : split.source_name;
     if (filterCategory    && split.category_name !== filterCategory)       return false;
     if (filterBudget      && split.budget_name   !== filterBudget)         return false;
+    if (filterBill        && split.bill_name     !== filterBill)           return false;
     if (filterTag         && !(split.tags || []).includes(filterTag))      return false;
     if (filterDestination && dest                !== filterDestination)    return false;
     return true;
-  }), [transactions, filterCategory, filterBudget, filterTag, filterDestination]);
+  }), [transactions, filterCategory, filterBudget, filterBill, filterTag, filterDestination]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageStart  = (page - 1) * PAGE_SIZE;
   const pageTxs    = filtered.slice(pageStart, pageStart + PAGE_SIZE);
   const pageGroups = groupByDate(pageTxs);
 
-  const hasFilters = filterCategory || filterBudget || filterTag || filterDestination;
+  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterDestination;
 
   // Derive category/tag summaries from ALL loaded transactions (not filtered)
   const categorySummary = useMemo(() => {
@@ -379,6 +392,7 @@ export default function DashboardPage({ user, onLogout }) {
   const handlers = {
     onFilterCategory:    v => applyFilter(setFilterCategory, v),
     onFilterBudget:      v => applyFilter(setFilterBudget, v),
+    onFilterBill:        v => applyFilter(setFilterBill, v),
     onFilterTag:         v => applyFilter(setFilterTag, v),
     onFilterDestination: v => applyFilter(setFilterDestination, v),
   };
@@ -418,19 +432,17 @@ export default function DashboardPage({ user, onLogout }) {
             {budgets.length > 0 && (
               <section className="px-4 sm:px-0">
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
-                    const spent = b.spent || 0;
                     const isActive = filterBudget === name;
                     return (
                       <button key={b.id} onClick={() => applyFilter(setFilterBudget, isActive ? null : name)}
-                        className={`text-left rounded-lg border px-4 py-3 transition-colors
-                          ${isActive ? 'bg-stone-800 border-stone-800 text-white' : 'bg-white border-stone-200 hover:border-stone-400'}`}>
-                        <p className={`text-xs uppercase tracking-wide mb-1 ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>{name}</p>
-                        <p className={`text-base font-semibold tabular-nums ${isActive ? 'text-white' : 'text-red-600'}`}>
-                          − {fmt(spent)}
-                        </p>
+                        className={`text-sm px-4 py-1.5 rounded-full border transition-colors
+                          ${isActive
+                            ? 'bg-stone-800 border-stone-800 text-white'
+                            : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
+                        {name}
                       </button>
                     );
                   })}
@@ -444,6 +456,7 @@ export default function DashboardPage({ user, onLogout }) {
                 <span className="text-xs text-stone-400 uppercase tracking-wide shrink-0">Filter:</span>
                 {filterCategory    && <FilterPill label={filterCategory}    onClear={() => applyFilter(setFilterCategory, null)} />}
                 {filterBudget      && <FilterPill label={filterBudget}      onClear={() => applyFilter(setFilterBudget, null)} />}
+                {filterBill        && <FilterPill label={filterBill}        onClear={() => applyFilter(setFilterBill, null)} />}
                 {filterTag         && <FilterPill label={filterTag}         onClear={() => applyFilter(setFilterTag, null)} />}
                 {filterDestination && <FilterPill label={`→ ${filterDestination}`} onClear={() => applyFilter(setFilterDestination, null)} />}
                 <button onClick={clearAll} className="text-xs text-stone-400 hover:text-stone-700 underline">
@@ -459,43 +472,23 @@ export default function DashboardPage({ user, onLogout }) {
                   Transactions
                   {totalPages > 1 && <span className="ml-2 normal-case font-normal">· {page}/{totalPages}</span>}
                 </h2>
-                {!mobile && (
-                  <span className="text-xs text-stone-300">Tap category, budget, account or tag to filter</span>
-                )}
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className="inline-flex items-center text-xs bg-white text-stone-600 px-2 py-0.5 rounded border border-stone-400 tracking-tight">account</span>
+                  <span className="inline-flex items-center text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full border border-stone-200">budget</span>
+                  <span className="inline-flex items-center text-xs bg-white text-stone-500 px-2 py-0.5 rounded border border-stone-400" style={{position:'relative',paddingLeft:10,paddingRight:10}}>bill</span>
+                  <span className="inline-flex items-center text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-sm border-l-2 border-blue-300 font-medium">category</span>
+                  <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-r-full border-l-2" style={{background:'#faf8f2',color:'#b8a06a',borderColor:'#ddd0a8'}}>
+                    <span style={{width:5,height:5,borderRadius:'50%',background:'#b8a06a',display:'inline-block'}} />tag
+                  </span>
+                </div>
               </div>
 
               <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
-                {mobile ? (
-                  // ── Mobile: card list ──
-                  <>
-                    {pageGroups.map(([date, txs]) => (
-                      <DateGroup key={date} date={date} transactions={txs} mobile={true} {...handlers} />
-                    ))}
-                    {filtered.length === 0 && (
-                      <p className="py-12 text-center text-stone-300 text-sm">No transactions found.</p>
-                    )}
-                  </>
-                ) : (
-                  // ── Desktop: table ──
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-stone-200 bg-stone-50">
-                        {['Description', 'From', 'To', 'Amount'].map(h => (
-                          <th key={h} className={`py-2 pr-3 ${h === 'Description' ? 'pl-4' : ''} text-xs font-semibold text-stone-400 uppercase tracking-wide ${h === 'Amount' ? 'text-right pr-4' : 'text-left'}`}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pageGroups.map(([date, txs]) => (
-                        <DateGroup key={date} date={date} transactions={txs} mobile={false} {...handlers} />
-                      ))}
-                      {filtered.length === 0 && (
-                        <tr><td colSpan={6} className="py-12 text-center text-stone-300 text-sm">No transactions found.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
+                {pageGroups.map(([date, txs]) => (
+                  <DateGroup key={date} date={date} transactions={txs} {...handlers} />
+                ))}
+                {filtered.length === 0 && (
+                  <p className="py-12 text-center text-stone-300 text-sm">No transactions found.</p>
                 )}
               </div>
 
@@ -597,6 +590,31 @@ export default function DashboardPage({ user, onLogout }) {
                 </div>
               )}
             </section>
+
+            {/* ── Bills ── */}
+            {bills.length > 0 && (
+              <section>
+                <button onClick={() => setBillsOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
+                    Bills
+                  </h2>
+                  <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
+                    {billsOpen ? '▲' : '▼'}
+                  </span>
+                </button>
+                {billsOpen && (
+                  <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+                    {bills.map(b => (
+                      <BillRow key={b.id} bill={b}
+                        isActive={filterBill === b.attributes?.name}
+                        onClick={() => applyFilter(setFilterBill, filterBill === b.attributes?.name ? null : b.attributes?.name)} />
+                    ))}
+                    {bills.length === 0 && <p className="py-8 text-center text-stone-300 text-sm">No bills found.</p>}
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* ── Tags ── */}
             {tagSummary.length > 0 && (

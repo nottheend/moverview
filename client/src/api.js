@@ -32,7 +32,12 @@ export const firefly = {
     return { data, hasMore };
   },
 
-  // Fetch all budgets with their spent amount for the current period
+  // Fetch all bills
+  bills: async () => {
+    const res = await request('/api/firefly/bills?limit=50');
+    return res.data || [];
+  },
+
   budgets: async () => {
     const res = await request('/api/firefly/budgets?limit=50');
     const budgets = res.data || [];
@@ -42,7 +47,14 @@ export const firefly = {
       try {
         const limRes = await request(`/api/firefly/budgets/${b.id}/limits?limit=10`);
         const limits = limRes.data || [];
-        const spent = limits.reduce((sum, l) => sum + parseFloat(l.attributes?.spent || 0), 0);
+        const spent = limits.reduce((sum, l) => {
+          const spentArr = l.attributes?.spent;
+          // Firefly III returns spent as an array of { sum: "-123.45", currency_id: ... }
+          const spentSum = Array.isArray(spentArr)
+            ? spentArr.reduce((s, entry) => s + parseFloat(entry.sum || 0), 0)
+            : parseFloat(spentArr || 0);
+          return sum + spentSum;
+        }, 0);
         return { ...b, spent: Math.abs(spent) };
       } catch {
         return { ...b, spent: 0 };
