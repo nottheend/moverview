@@ -196,7 +196,7 @@ const TransactionRow = TransactionCard;
 
 // ── Date group ────────────────────────────────────────────────────────────────
 
-function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFilterTag, onFilterDestination }) {
+function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFilterBill, onFilterTag, onFilterDestination }) {
   const net = transactions.reduce((sum, tx) => {
     const split  = tx.attributes?.transactions?.[0] || {};
     const type   = txType(split);
@@ -217,7 +217,7 @@ function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFil
       {transactions.map(tx => (
         <TransactionCard key={tx.id} tx={tx}
           onFilterCategory={onFilterCategory} onFilterBudget={onFilterBudget}
-          onFilterTag={onFilterTag} onFilterDestination={onFilterDestination} />
+          onFilterBill={onFilterBill} onFilterTag={onFilterTag} onFilterDestination={onFilterDestination} />
       ))}
     </>
   );
