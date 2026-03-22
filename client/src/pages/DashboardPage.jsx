@@ -106,6 +106,9 @@ function BillRow({ bill, isActive, onClick }) {
 }
 
 
+// ── Group transactions by date ────────────────────────────────────────────────
+
+function groupByDate(transactions) {
   const groups = {};
   for (const tx of transactions) {
     const split = tx.attributes?.transactions?.[0] || {};
