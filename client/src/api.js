@@ -24,12 +24,7 @@ export const firefly = {
   accounts: (type = 'asset', page = 1) =>
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
-  transactionPage: async (page = 1) => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 30);
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr   = end.toISOString().slice(0, 10);
+  transactionPage: async (page = 1, startStr, endStr) => {
     const res = await request(`/api/firefly/transactions?page=${page}&limit=50&type=default&start=${startStr}&end=${endStr}`);
     const data = res.data || [];
     const pagination = res.meta?.pagination;
@@ -43,13 +38,7 @@ export const firefly = {
     return res.data || [];
   },
 
-  budgets: async () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 30);
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr   = end.toISOString().slice(0, 10);
-
+  budgets: async (startStr, endStr) => {
     const res = await request(`/api/firefly/budgets?limit=50`);
     const budgets = res.data || [];
 

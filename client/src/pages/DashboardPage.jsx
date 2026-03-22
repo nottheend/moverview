@@ -1,5 +1,39 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { firefly } from '../api.js';
+
+// ── Date range helpers ────────────────────────────────────────────────────────
+
+function toISO(d) { return d.toISOString().slice(0, 10); }
+
+function getPreset(key) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (key) {
+    case 'last30': {
+      const s = new Date(); s.setDate(s.getDate() - 30);
+      return { start: toISO(s), end: toISO(now), label: 'Last 30 days' };
+    }
+    case 'thisMonth':
+      return { start: toISO(new Date(y, m, 1)), end: toISO(now), label: 'This month' };
+    case 'lastMonth': {
+      const s = new Date(y, m - 1, 1);
+      const e = new Date(y, m, 0);
+      return { start: toISO(s), end: toISO(e), label: 'Last month' };
+    }
+    case 'thisYear':
+      return { start: toISO(new Date(y, 0, 1)), end: toISO(now), label: 'This year' };
+    default:
+      return getPreset('last30');
+  }
+}
+
+const PRESETS = [
+  { key: 'last30',    label: 'Last 30 days' },
+  { key: 'thisMonth', label: 'This month' },
+  { key: 'lastMonth', label: 'Last month' },
+  { key: 'thisYear',  label: 'This year' },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -258,6 +292,18 @@ export default function DashboardPage({ user, onLogout }) {
   const [fireflyPage,  setFireflyPage]  = useState(1);
   const [error,        setError]        = useState('');
 
+  const [datePreset,   setDatePreset]   = useState('last30');
+  const [customStart,  setCustomStart]  = useState('');
+  const [customEnd,    setCustomEnd]    = useState('');
+  const [pickerOpen,   setPickerOpen]   = useState(false);
+  const pickerRef = useRef(null);
+
+  const activeDateRange = useMemo(() => {
+    if (datePreset === 'custom' && customStart && customEnd)
+      return { start: customStart, end: customEnd, label: `${customStart} – ${customEnd}` };
+    return getPreset(datePreset);
+  }, [datePreset, customStart, customEnd]);
+
   const [filterCategory,   setFilterCategory]   = useState(null);
   const [filterBudget,     setFilterBudget]      = useState(null);
   const [filterBill,       setFilterBill]        = useState(null);
@@ -277,19 +323,32 @@ export default function DashboardPage({ user, onLogout }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
+  // Close picker on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setTransactions([]);
+      setPage(1);
+      setFireflyPage(1);
       try {
+        const { start, end } = activeDateRange;
         const [acctRes, txRes, budgetList, billList] = await Promise.all([
           firefly.accounts('asset'),
-          firefly.transactionPage(1),
-          firefly.budgets(),
+          firefly.transactionPage(1, start, end),
+          firefly.budgets(start, end),
           firefly.bills(),
         ]);
         setAccounts(acctRes.data || []);
         setTransactions(dedupe(txRes.data));
         setHasMore(txRes.hasMore);
-        setFireflyPage(1);
         setBudgets(budgetList);
         setBills(billList);
       } catch (err) {
@@ -299,14 +358,15 @@ export default function DashboardPage({ user, onLogout }) {
       }
     }
     load();
-  }, []);
+  }, [activeDateRange]);
 
   async function loadMore() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
       const nextPage = fireflyPage + 1;
-      const txRes = await firefly.transactionPage(nextPage);
+      const { start, end } = activeDateRange;
+      const txRes = await firefly.transactionPage(nextPage, start, end);
       setTransactions(prev => dedupe([...prev, ...txRes.data]));
       setHasMore(txRes.hasMore);
       setFireflyPage(nextPage);
@@ -390,14 +450,6 @@ export default function DashboardPage({ user, onLogout }) {
     onFilterDestination: v => applyFilter(setFilterDestination, v),
   };
 
-  const dateRange = useMemo(() => {
-    if (transactions.length === 0) return null;
-    const dates = transactions.map(tx => tx.attributes?.transactions?.[0]?.date?.slice(0, 10)).filter(Boolean);
-    const min = dates.reduce((a, b) => a < b ? a : b);
-    const max = dates.reduce((a, b) => a > b ? a : b);
-    if (min === max) return fmtDateShort(min);
-    return `${fmtDateShort(min)} – ${fmtDateShort(max)}`;
-  }, [transactions]);
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
@@ -433,15 +485,49 @@ export default function DashboardPage({ user, onLogout }) {
             {/* ── Budget strip ── */}
             {budgets.length > 0 && (
               <section className="px-4 sm:px-0">
-                {!loading && !loadingMore && dateRange && (
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex-1 h-px bg-stone-200" />
-                    <span className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 bg-white border border-stone-400 rounded px-3 py-1.5 whitespace-nowrap">
-                      <span>📅</span>{dateRange}
-                    </span>
-                    <div className="flex-1 h-px bg-stone-200" />
+                {/* Date picker */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 h-px bg-stone-200" />
+                  <div className="relative" ref={pickerRef}>
+                    <button
+                      onClick={() => setPickerOpen(o => !o)}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 bg-white border border-stone-400 rounded px-3 py-1.5 hover:border-stone-600 transition-colors whitespace-nowrap"
+                    >
+                      <span>📅</span>
+                      {activeDateRange.label}
+                      <span className="text-stone-400 text-xs">{pickerOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {pickerOpen && (
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white border border-stone-200 rounded-lg shadow-lg z-50 min-w-[220px] overflow-hidden">
+                        {PRESETS.map(p => (
+                          <button key={p.key}
+                            onClick={() => { setDatePreset(p.key); setPickerOpen(false); }}
+                            className={`w-full text-left px-4 py-2.5 text-sm border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
+                              ${datePreset === p.key ? 'font-semibold text-stone-800 bg-stone-50' : 'text-stone-600'}`}>
+                            {p.label}
+                          </button>
+                        ))}
+                        {/* Custom range */}
+                        <div className="px-4 py-3 border-t border-stone-100">
+                          <p className="text-xs text-stone-400 uppercase tracking-wide mb-2">Custom range</p>
+                          <div className="flex flex-col gap-2">
+                            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                              className="text-xs border border-stone-200 rounded px-2 py-1 text-stone-600 w-full" />
+                            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                              className="text-xs border border-stone-200 rounded px-2 py-1 text-stone-600 w-full" />
+                            <button
+                              disabled={!customStart || !customEnd}
+                              onClick={() => { setDatePreset('custom'); setPickerOpen(false); }}
+                              className="text-xs bg-stone-800 text-white rounded px-3 py-1.5 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                  <div className="flex-1 h-px bg-stone-200" />
+                </div>
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
