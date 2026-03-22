@@ -25,7 +25,12 @@ export const firefly = {
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
   transactionPage: async (page = 1) => {
-    const res = await request(`/api/firefly/transactions?page=${page}&limit=50&type=default`);
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    const startStr = start.toISOString().slice(0, 10);
+    const endStr   = end.toISOString().slice(0, 10);
+    const res = await request(`/api/firefly/transactions?page=${page}&limit=50&type=default&start=${startStr}&end=${endStr}`);
     const data = res.data || [];
     const pagination = res.meta?.pagination;
     const hasMore = pagination ? page < pagination.total_pages : data.length === 50;
