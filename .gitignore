@@ -1,5 +1,6 @@
 # Environment
 .env
+CloudronManifest.json
 
 # Dependencies
 node_modules/

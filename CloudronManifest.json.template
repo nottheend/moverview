@@ -4,7 +4,7 @@
   "author": "Nottheend <info@nottheend.info>",
   "description": "Personal finance dashboard powered by Firefly-III",
   "tagline": "Your money, clearly.",
-  "version": "0.0.1",
+  "version": "VERSION_PLACEHOLDER",
   "healthCheckPath": "/api/health",
   "httpPort": 3000,
   "addons": {

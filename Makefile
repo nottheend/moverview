@@ -47,6 +47,14 @@ install-deps: ## Install all npm dependencies
 	cd server && npm install
 	cd client && npm install
 
+# ── Manifest ──────────────────────────────────────────────────────────────────
+
+.PHONY: manifest
+manifest: ## Inject current git tag into CloudronManifest.json
+	@echo "Generating CloudronManifest.json for version $(VERSION)"
+	@sed 's/VERSION_PLACEHOLDER/$(VERSION)/' CloudronManifest.json.template > CloudronManifest.json
+	@echo "  → CloudronManifest.json updated"
+
 # ── Docker ────────────────────────────────────────────────────────────────────
 
 .PHONY: login
@@ -55,7 +63,7 @@ login: ## Login to your Cloudron's Docker registry (do this once per machine)
 	docker login $(CLOUDRON_REGISTRY)
 
 .PHONY: build
-build: ## Build Docker image locally
+build: manifest ## Build Docker image locally
 	docker build --build-arg APP_VERSION=$(VERSION) -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
 	@echo "Built: $(IMAGE):$(VERSION)"
 
