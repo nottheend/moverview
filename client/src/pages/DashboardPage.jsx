@@ -28,6 +28,20 @@ function txType(split) {
   return 'transfer';
 }
 
+// ── Chip style constants ─────────────────────────────────────────────────────
+// Single source — used in both mobile cards and desktop rows
+
+const CHIP = {
+  cat:     'inline-flex items-center text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-sm border-l-2 border-blue-300 font-medium hover:bg-blue-100 transition-colors cursor-pointer',
+  budget:  'inline-flex items-center text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full border border-stone-200 hover:bg-stone-200 transition-colors cursor-pointer',
+  tag:     'inline-flex items-center gap-1 text-xs bg-pink-50 text-pink-700 pl-1.5 pr-2.5 py-0.5 rounded-r-full border-l-2 border-pink-300 hover:bg-pink-100 transition-colors cursor-pointer',
+  account: 'text-xs text-stone-400 hover:text-stone-600 transition-colors cursor-pointer',
+};
+
+function TagDot() {
+  return <span style={{width:5,height:5,borderRadius:'50%',background:'#f472b6',flexShrink:0,display:'inline-block'}} />;
+}
+
 function groupByDate(transactions) {
   const groups = {};
   for (const tx of transactions) {
@@ -79,43 +93,25 @@ function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterTag, on
     ? split.destination_name
     : isExpense ? split.destination_name : split.source_name;
 
+  const amountColor = isExpense ? 'text-red-600' : isTransfer ? 'text-indigo-600' : 'text-emerald-700';
+  const typeLabel   = isExpense ? 'Expense' : isTransfer ? 'Transfer' : 'Income';
+
   return (
     <div className="border-b border-stone-100 px-4 py-3">
-      {/* Row 1: description + amount */}
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-stone-800 font-medium leading-snug flex-1">{split.description || '—'}</p>
-        <span className={`text-sm font-semibold tabular-nums shrink-0
-          ${isExpense ? 'text-red-600' : isTransfer ? 'text-blue-600' : 'text-emerald-700'}`}>
-          {isExpense ? '−' : isTransfer ? '⇄' : '+'} {fmt(split.amount, split.currency_symbol)}
-        </span>
+        <p className="text-sm text-stone-800 font-medium leading-snug flex-1 pt-0.5">{split.description || '—'}</p>
+        <div className="text-right shrink-0">
+          <p className={`text-sm font-semibold tabular-nums ${amountColor}`}>
+            {isExpense ? '−' : isTransfer ? '⇄' : '+'} {fmt(split.amount, split.currency_symbol)}
+          </p>
+          <p className={`text-xs uppercase tracking-wide mt-0.5 ${amountColor}`} style={{opacity:0.7}}>{typeLabel}</p>
+        </div>
       </div>
-
-      {/* Row 2: meta chips */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
-        {split.category_name && (
-          <button onClick={() => onFilterCategory(split.category_name)}
-            className="text-xs text-stone-500 hover:text-stone-800 hover:underline">
-            {split.category_name}
-          </button>
-        )}
-        {split.budget_name && (
-          <button onClick={() => onFilterBudget(split.budget_name)}
-            className="text-xs text-stone-400 hover:text-stone-700 hover:underline">
-            {split.budget_name}
-          </button>
-        )}
-        {destination && (
-          <button onClick={() => onFilterDestination(destination)}
-            className="text-xs text-stone-400 hover:text-stone-700 hover:underline">
-            → {destination}
-          </button>
-        )}
-        {tags.map(tag => (
-          <button key={tag} onClick={() => onFilterTag(tag)}
-            className="text-xs bg-stone-100 text-stone-500 rounded px-1.5 py-0.5 hover:bg-stone-800 hover:text-white transition-colors">
-            {tag}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {split.category_name && <button onClick={() => onFilterCategory(split.category_name)} className={CHIP.cat}>{split.category_name}</button>}
+        {split.budget_name   && <button onClick={() => onFilterBudget(split.budget_name)}     className={CHIP.budget}>{split.budget_name}</button>}
+        {tags.map(tag => <button key={tag} onClick={() => onFilterTag(tag)} className={CHIP.tag}><TagDot />{tag}</button>)}
+        {destination && <button onClick={() => onFilterDestination(destination)} className={CHIP.account}>→ {destination}</button>}
       </div>
     </div>
   );
@@ -134,42 +130,32 @@ function TransactionRow({ tx, onFilterCategory, onFilterBudget, onFilterTag, onF
     ? split.destination_name
     : isExpense ? split.destination_name : null;
 
+  const amountColor = isExpense ? 'text-red-600' : isTransfer ? 'text-indigo-600' : 'text-emerald-700';
+  const typeLabel   = isExpense ? 'Expense' : isTransfer ? 'Transfer' : 'Income';
+
   return (
     <tr className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-      {/* Description + tags */}
+      {/* Description + chips */}
       <td className="py-2.5 pr-3 pl-4">
         <p className="text-sm text-stone-800">{split.description || '—'}</p>
-        {tags.length > 0 && (
-          <div className="flex gap-1 mt-1 flex-wrap">
-            {tags.map(tag => (
-              <button key={tag} onClick={() => onFilterTag(tag)}
-                className="text-xs bg-stone-100 text-stone-500 rounded px-1.5 py-0.5 hover:bg-stone-800 hover:text-white transition-colors">
-                {tag}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex gap-1 mt-1 flex-wrap">
+          {split.category_name && <button onClick={() => onFilterCategory(split.category_name)} className={CHIP.cat}>{split.category_name}</button>}
+          {split.budget_name   && <button onClick={() => onFilterBudget(split.budget_name)}     className={CHIP.budget}>{split.budget_name}</button>}
+          {tags.map(tag => <button key={tag} onClick={() => onFilterTag(tag)} className={CHIP.tag}><TagDot />{tag}</button>)}
+        </div>
       </td>
-      {/* Category */}
-      <td className="py-2.5 pr-3 text-sm whitespace-nowrap">
-        <FilterLink value={split.category_name} onClick={onFilterCategory} className="text-stone-500" />
-      </td>
-      {/* Budget */}
-      <td className="py-2.5 pr-3 text-sm whitespace-nowrap">
-        <FilterLink value={split.budget_name} onClick={onFilterBudget} className="text-stone-500" />
-      </td>
-      {/* Source account */}
+      {/* Source */}
       <td className="py-2.5 pr-3 text-sm text-stone-400 whitespace-nowrap">
         {isExpense ? split.source_name : isTransfer ? split.source_name : split.destination_name}
       </td>
-      {/* Destination account */}
+      {/* Destination */}
       <td className="py-2.5 pr-3 text-sm whitespace-nowrap">
         <FilterLink value={destination} onClick={onFilterDestination} className="text-stone-400" />
       </td>
-      {/* Amount */}
-      <td className={`py-2.5 pr-4 text-sm font-medium text-right whitespace-nowrap tabular-nums
-        ${isExpense ? 'text-red-600' : isTransfer ? 'text-blue-600' : 'text-emerald-700'}`}>
-        {isExpense ? '−' : isTransfer ? '⇄' : '+'} {fmt(split.amount, split.currency_symbol)}
+      {/* Amount + type */}
+      <td className="py-2.5 pr-4 text-right whitespace-nowrap tabular-nums">
+        <p className={`text-sm font-semibold ${amountColor}`}>{isExpense ? '−' : isTransfer ? '⇄' : '+'} {fmt(split.amount, split.currency_symbol)}</p>
+        <p className={`text-xs uppercase tracking-wide mt-0.5 ${amountColor}`} style={{opacity:0.7}}>{typeLabel}</p>
       </td>
     </tr>
   );
@@ -494,7 +480,7 @@ export default function DashboardPage({ user, onLogout }) {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-stone-200 bg-stone-50">
-                        {['Description', 'Category', 'Budget', 'From', 'To', 'Amount'].map(h => (
+                        {['Description', 'From', 'To', 'Amount'].map(h => (
                           <th key={h} className={`py-2 pr-3 ${h === 'Description' ? 'pl-4' : ''} text-xs font-semibold text-stone-400 uppercase tracking-wide ${h === 'Amount' ? 'text-right pr-4' : 'text-left'}`}>
                             {h}
                           </th>
