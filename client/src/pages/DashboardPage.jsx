@@ -197,22 +197,10 @@ const TransactionRow = TransactionCard;
 // ── Date group ────────────────────────────────────────────────────────────────
 
 function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFilterBill, onFilterTag, onFilterDestination }) {
-  const net = transactions.reduce((sum, tx) => {
-    const split  = tx.attributes?.transactions?.[0] || {};
-    const type   = txType(split);
-    const amount = parseFloat(split.amount || 0);
-    if (type === 'expense') return sum - amount;
-    if (type === 'income')  return sum + amount;
-    return sum;
-  }, 0);
-
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-1.5 bg-stone-50 border-b border-stone-200">
+      <div className="flex items-center px-4 py-1.5 bg-stone-50 border-b border-stone-200 sticky top-[81px] z-10">
         <span className="text-xs font-semibold text-stone-400 uppercase tracking-widest">{fmtDate(date)}</span>
-        <span className={`text-xs font-semibold tabular-nums ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-          {net >= 0 ? '+' : '−'} {fmt(Math.abs(net))}
-        </span>
       </div>
       {transactions.map(tx => (
         <TransactionCard key={tx.id} tx={tx}
@@ -413,23 +401,29 @@ export default function DashboardPage({ user, onLogout }) {
     <div className="min-h-screen bg-stone-50 text-stone-900">
 
       {/* Nav */}
-      <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2 min-w-0">
-          <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
-          <span className="text-stone-300 shrink-0">·</span>
-          <span className="text-sm text-stone-400 truncate">
-            {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
-            {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
-          </span>
-          {!loading && !loadingMore && dateRange && <>
-            <span className="text-stone-300 shrink-0 hidden sm:inline">·</span>
-            <span className="text-xs text-stone-500 shrink-0 hidden sm:inline">{dateRange}</span>
-          </>}
+      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
+            <span className="text-stone-300 shrink-0">·</span>
+            <span className="text-sm text-stone-400 truncate">
+              {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
+              {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
+            </span>
+          </div>
+          <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
+          <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
+            Sign out
+          </button>
         </div>
-        <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
-        <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
-          Sign out
-        </button>
+        {!loading && !loadingMore && dateRange && (
+          <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-stone-50 border-t border-stone-100">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 bg-white border border-stone-400 rounded px-2 py-0.5">
+              <span>📅</span>
+              {dateRange}
+            </span>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-6xl px-0 sm:px-4 py-6 space-y-6">
@@ -451,14 +445,20 @@ export default function DashboardPage({ user, onLogout }) {
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
+                    const spent = b.spent || 0;
                     const isActive = filterBudget === name;
                     return (
                       <button key={b.id} onClick={() => applyFilter(setFilterBudget, isActive ? null : name)}
-                        className={`text-sm px-4 py-1.5 rounded-full border transition-colors
+                        className={`flex items-center gap-2 text-sm px-4 py-1.5 rounded-full border transition-colors
                           ${isActive
                             ? 'bg-stone-800 border-stone-800 text-white'
                             : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
-                        {name}
+                        <span>{name}</span>
+                        {spent > 0 && (
+                          <span className={`text-xs tabular-nums ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
+                            {fmt(spent)}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
