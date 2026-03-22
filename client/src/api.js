@@ -58,4 +58,22 @@ export const firefly = {
 
     return withSpent;
   },
+
+  // Fetch all budget limit periods in one call using the dedicated endpoint
+  budgetPeriods: async () => {
+    const res = await request(`/api/firefly/budget-limits?limit=200`);
+    const limits = res.data || [];
+
+    const periodMap = {};
+    limits.forEach(l => {
+      const start = l.attributes?.start;
+      const end   = l.attributes?.end;
+      if (start && end) {
+        const key = `${start}|${end}`;
+        if (!periodMap[key]) periodMap[key] = { start, end };
+      }
+    });
+
+    return Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
+  },
 };

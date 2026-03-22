@@ -286,6 +286,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [budgets,      setBudgets]      = useState([]);
   const [bills,        setBills]        = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [budgetPeriods,setBudgetPeriods]= useState([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState('');
 
@@ -297,7 +298,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   const activeDateRange = useMemo(() => {
     if (datePreset === 'custom' && customStart && customEnd)
-      return { start: customStart, end: customEnd, label: `${customStart} – ${customEnd}` };
+      return { start: customStart, end: customEnd, label: `${fmtDateShort(customStart)} – ${fmtDateShort(customEnd)}` };
     return getPreset(datePreset);
   }, [datePreset, customStart, customEnd]);
 
@@ -318,6 +319,11 @@ export default function DashboardPage({ user, onLogout }) {
     const handler = () => setMobile(window.innerWidth < 768);
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  // Fetch budget periods once on mount
+  useEffect(() => {
+    firefly.budgetPeriods().then(setBudgetPeriods).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -467,7 +473,7 @@ export default function DashboardPage({ user, onLogout }) {
                       <span className="text-stone-400 text-xs">{pickerOpen ? '▲' : '▼'}</span>
                     </button>
                     {pickerOpen && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white border border-stone-200 rounded-lg shadow-lg z-50 min-w-[220px] overflow-hidden">
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white border border-stone-200 rounded-lg shadow-lg z-50 min-w-[240px] overflow-hidden">
                         {PRESETS.map(p => (
                           <button key={p.key}
                             onClick={() => { setDatePreset(p.key); setPickerOpen(false); }}
@@ -476,6 +482,26 @@ export default function DashboardPage({ user, onLogout }) {
                             {p.label}
                           </button>
                         ))}
+                        {budgetPeriods.length > 0 && (
+                          <>
+                            <div className="px-4 py-2 border-t border-stone-100 bg-stone-50">
+                              <p className="text-xs text-stone-400 uppercase tracking-wide">Budget periods</p>
+                            </div>
+                            {budgetPeriods.map(p => {
+                              const label = `${fmtDateShort(p.start)} – ${fmtDateShort(p.end)}`;
+                              const key = `${p.start}|${p.end}`;
+                              const isActive = datePreset === 'custom' && customStart === p.start && customEnd === p.end;
+                              return (
+                                <button key={key}
+                                  onClick={() => { setDatePreset('custom'); setCustomStart(p.start); setCustomEnd(p.end); setPickerOpen(false); }}
+                                  className={`w-full text-left px-4 py-2 text-sm border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
+                                    ${isActive ? 'font-semibold text-stone-800 bg-stone-50' : 'text-stone-600'}`}>
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
                         {/* Custom range */}
                         <div className="px-4 py-3 border-t border-stone-100">
                           <p className="text-xs text-stone-400 uppercase tracking-wide mb-2">Custom range</p>
