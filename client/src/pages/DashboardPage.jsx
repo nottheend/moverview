@@ -199,7 +199,7 @@ const TransactionRow = TransactionCard;
 function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFilterBill, onFilterTag, onFilterDestination }) {
   return (
     <>
-      <div className="flex items-center px-4 py-1.5 bg-stone-50 border-b border-stone-200 sticky top-[81px] z-10">
+      <div className="flex items-center px-4 py-1.5 bg-stone-50 border-b border-stone-200 sticky top-[53px] z-10">
         <span className="text-xs font-semibold text-stone-400 uppercase tracking-widest">{fmtDate(date)}</span>
       </div>
       {transactions.map(tx => (
@@ -401,29 +401,19 @@ export default function DashboardPage({ user, onLogout }) {
     <div className="min-h-screen bg-stone-50 text-stone-900">
 
       {/* Nav */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
-            <span className="text-stone-300 shrink-0">·</span>
-            <span className="text-sm text-stone-400 truncate">
-              {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
-              {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
-            </span>
-          </div>
-          <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
-          <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
-            Sign out
-          </button>
+      <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-2 min-w-0">
+          <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
+          <span className="text-stone-300 shrink-0">·</span>
+          <span className="text-sm text-stone-400 truncate">
+            {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
+            {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
+          </span>
         </div>
-        {!loading && !loadingMore && dateRange && (
-          <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-stone-50 border-t border-stone-100">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 bg-white border border-stone-400 rounded px-2 py-0.5">
-              <span>📅</span>
-              {dateRange}
-            </span>
-          </div>
-        )}
+        <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
+        <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
+          Sign out
+        </button>
       </header>
 
       <main className="mx-auto max-w-6xl px-0 sm:px-4 py-6 space-y-6">
@@ -441,6 +431,13 @@ export default function DashboardPage({ user, onLogout }) {
             {/* ── Budget strip ── */}
             {budgets.length > 0 && (
               <section className="px-4 sm:px-0">
+                {!loading && !loadingMore && dateRange && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 bg-white border border-stone-400 rounded px-2.5 py-1">
+                      <span>📅</span>{dateRange}
+                    </span>
+                  </div>
+                )}
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
