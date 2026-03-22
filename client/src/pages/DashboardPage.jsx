@@ -162,11 +162,15 @@ function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterBill, o
 
   const amountColor = isExpense ? 'text-red-600' : isTransfer ? 'text-indigo-600' : 'text-emerald-700';
   const typeLabel   = isExpense ? 'Expense' : isTransfer ? 'Transfer' : 'Income';
+  const dateLabel   = split.date ? fmtDateShort(split.date) : null;
 
   return (
     <div className="border-b border-stone-100 px-4 py-3 hover:bg-stone-50 transition-colors">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-stone-800 font-medium leading-snug flex-1 pt-0.5">{split.description || '—'}</p>
+        <div className="flex items-baseline gap-2 flex-1 min-w-0 pt-0.5">
+          <p className="text-sm text-stone-800 font-medium leading-snug">{split.description || '—'}</p>
+          {dateLabel && <span className="text-xs text-stone-400 whitespace-nowrap shrink-0">{dateLabel}</span>}
+        </div>
         <div className="text-right shrink-0">
           <p className={`text-sm font-semibold tabular-nums ${amountColor}`}>
             {isExpense ? '−' : isTransfer ? '⇄' : '+'} {fmt(split.amount, split.currency_symbol)}
@@ -199,9 +203,6 @@ const TransactionRow = TransactionCard;
 function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFilterBill, onFilterTag, onFilterDestination }) {
   return (
     <>
-      <div className="flex items-center px-4 py-1.5 bg-stone-50 border-b border-stone-200 sticky top-[53px] z-10">
-        <span className="text-xs font-semibold text-stone-400 uppercase tracking-widest">{fmtDate(date)}</span>
-      </div>
       {transactions.map(tx => (
         <TransactionCard key={tx.id} tx={tx}
           onFilterCategory={onFilterCategory} onFilterBudget={onFilterBudget}
@@ -432,10 +433,12 @@ export default function DashboardPage({ user, onLogout }) {
             {budgets.length > 0 && (
               <section className="px-4 sm:px-0">
                 {!loading && !loadingMore && dateRange && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 bg-white border border-stone-400 rounded px-2.5 py-1">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-stone-200" />
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 bg-white border border-stone-400 rounded px-3 py-1.5 whitespace-nowrap">
                       <span>📅</span>{dateRange}
                     </span>
+                    <div className="flex-1 h-px bg-stone-200" />
                   </div>
                 )}
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
