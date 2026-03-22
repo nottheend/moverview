@@ -59,26 +59,29 @@ export const firefly = {
     return withSpent;
   },
 
-  // Fetch all budget limit periods in one call using the dedicated endpoint
+  // Fetch all budget limit periods — fetch year by year to avoid server timeout
   budgetPeriods: async () => {
-    const now   = new Date();
-    const start = new Date(now.getFullYear() - 2, 0, 1).toISOString().slice(0, 10);
-    const end   = new Date(now.getFullYear() + 1, 11, 31).toISOString().slice(0, 10);
-    const res = await request(`/api/firefly/budget-limits?limit=200&start=${start}&end=${end}`);
-    const limits = res.data || [];
+    const now       = new Date();
+    const thisYear  = now.getFullYear();
+    const years     = [thisYear - 1, thisYear, thisYear + 1];
 
     const periodMap = {};
-    limits.forEach(l => {
-      const start = (l.attributes?.start || '').slice(0, 10);
-      const end   = (l.attributes?.end   || '').slice(0, 10);
-      if (start && end) {
-        const key = `${start}|${end}`;
-        if (!periodMap[key]) periodMap[key] = { start, end };
-      }
-    });
+    await Promise.all(years.map(async y => {
+      try {
+        const start = `${y}-01-01`;
+        const end   = `${y}-12-31`;
+        const res = await request(`/api/firefly/budget-limits?limit=50&start=${start}&end=${end}`);
+        (res.data || []).forEach(l => {
+          const s = (l.attributes?.start || '').slice(0, 10);
+          const e = (l.attributes?.end   || '').slice(0, 10);
+          if (s && e && s >= '2024-11-01') {
+            const key = `${s}|${e}`;
+            if (!periodMap[key]) periodMap[key] = { start: s, end: e };
+          }
+        });
+      } catch { /* skip year on error */ }
+    }));
 
-    return Object.values(periodMap)
-      .filter(p => p.start >= '2024-11-01')
-      .sort((a, b) => b.start.localeCompare(a.start));
+    return Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
   },
 };
