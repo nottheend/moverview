@@ -24,12 +24,9 @@ export const firefly = {
   accounts: (type = 'asset', page = 1) =>
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
-  transactionPage: async (page = 1, startStr, endStr) => {
-    const res = await request(`/api/firefly/transactions?page=${page}&limit=50&type=default&start=${startStr}&end=${endStr}`);
-    const data = res.data || [];
-    const pagination = res.meta?.pagination;
-    const hasMore = pagination ? page < pagination.total_pages : data.length === 50;
-    return { data, hasMore };
+  transactions: async (startStr, endStr) => {
+    const res = await request(`/api/firefly/transactions?page=1&limit=500&type=default&start=${startStr}&end=${endStr}`);
+    return res.data || [];
   },
 
   // Fetch all bills

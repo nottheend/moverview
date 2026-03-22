@@ -287,9 +287,6 @@ export default function DashboardPage({ user, onLogout }) {
   const [bills,        setBills]        = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading,      setLoading]      = useState(true);
-  const [loadingMore,  setLoadingMore]  = useState(false);
-  const [hasMore,      setHasMore]      = useState(false);
-  const [fireflyPage,  setFireflyPage]  = useState(1);
   const [error,        setError]        = useState('');
 
   const [datePreset,   setDatePreset]   = useState('last30');
@@ -323,32 +320,21 @@ export default function DashboardPage({ user, onLogout }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Close picker on outside click
-  useEffect(() => {
-    function handleClick(e) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
   useEffect(() => {
     async function load() {
       setLoading(true);
       setTransactions([]);
       setPage(1);
-      setFireflyPage(1);
       try {
         const { start, end } = activeDateRange;
-        const [acctRes, txRes, budgetList, billList] = await Promise.all([
+        const [acctRes, txData, budgetList, billList] = await Promise.all([
           firefly.accounts('asset'),
-          firefly.transactionPage(1, start, end),
+          firefly.transactions(start, end),
           firefly.budgets(start, end),
           firefly.bills(),
         ]);
         setAccounts(acctRes.data || []);
-        setTransactions(dedupe(txRes.data));
-        setHasMore(txRes.hasMore);
+        setTransactions(dedupe(txData));
         setBudgets(budgetList);
         setBills(billList);
       } catch (err) {
@@ -360,23 +346,6 @@ export default function DashboardPage({ user, onLogout }) {
     load();
   }, [activeDateRange]);
 
-  async function loadMore() {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const nextPage = fireflyPage + 1;
-      const { start, end } = activeDateRange;
-      const txRes = await firefly.transactionPage(nextPage, start, end);
-      setTransactions(prev => dedupe([...prev, ...txRes.data]));
-      setHasMore(txRes.hasMore);
-      setFireflyPage(nextPage);
-      setPage(p => p + 1);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   function dedupe(txs) {
     const seen = new Set();
@@ -460,8 +429,8 @@ export default function DashboardPage({ user, onLogout }) {
           <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
-            {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
-            {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
+            {loading ? 'Loading…' : `${transactions.length} transactions`}
+            {!loading && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
           </span>
         </div>
         <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
@@ -599,8 +568,7 @@ export default function DashboardPage({ user, onLogout }) {
                 )}
               </div>
 
-              {/* Pagination */}
-              {(totalPages > 1 || hasMore) && (
+              {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4 px-4 sm:px-0">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                     className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -ml-3">
@@ -614,19 +582,11 @@ export default function DashboardPage({ user, onLogout }) {
                         {p}
                       </button>
                     ))}
-                    {hasMore && <span className="w-8 h-8 flex items-center justify-center text-stone-300 text-xs">…</span>}
                   </div>
-                  {page === totalPages && hasMore ? (
-                    <button onClick={loadMore} disabled={loadingMore}
-                      className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -mr-3">
-                      {loadingMore ? 'Loading…' : 'Weiter →'}
-                    </button>
-                  ) : (
-                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages && !hasMore}
-                      className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -mr-3">
-                      Weiter →
-                    </button>
-                  )}
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                    className="text-sm text-stone-500 hover:text-stone-800 disabled:opacity-30 disabled:cursor-not-allowed py-2 px-3 -mr-3">
+                    Weiter →
+                  </button>
                 </div>
               )}
             </section>
