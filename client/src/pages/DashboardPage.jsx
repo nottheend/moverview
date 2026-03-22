@@ -398,6 +398,18 @@ export default function DashboardPage({ user, onLogout }) {
     return Object.entries(map).sort(([,a],[,b]) => b - a);
   }, [transactions]);
 
+  const periodSummary = useMemo(() => {
+    let income = 0, expense = 0;
+    transactions.forEach(tx => {
+      const split = tx.attributes?.transactions?.[0] || {};
+      const type  = txType(split);
+      const amount = parseFloat(split.amount || 0);
+      if (type === 'income')  income  += amount;
+      if (type === 'expense') expense += amount;
+    });
+    return { income, expense, net: income - expense };
+  }, [transactions]);
+
   const handlers = {
     onFilterCategory:    v => applyFilter(setFilterCategory, v),
     onFilterBudget:      v => applyFilter(setFilterBudget, v),
@@ -499,6 +511,26 @@ export default function DashboardPage({ user, onLogout }) {
                   <div className="flex-1 h-px bg-stone-200" />
                 </div>
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
+
+                {/* Period summary */}
+                {!loading && (
+                  <div className="flex rounded-lg border border-stone-200 bg-white overflow-hidden mb-4">
+                    <div className="flex-1 px-4 py-3 border-r border-stone-100">
+                      <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">Income</p>
+                      <p className="text-base font-bold tabular-nums text-emerald-600">+ {fmt(periodSummary.income)}</p>
+                    </div>
+                    <div className="flex-1 px-4 py-3 border-r border-stone-100">
+                      <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">Expenses</p>
+                      <p className="text-base font-bold tabular-nums text-red-600">− {fmt(periodSummary.expense)}</p>
+                    </div>
+                    <div className="flex-1 px-4 py-3">
+                      <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">Net</p>
+                      <p className={`text-base font-bold tabular-nums ${periodSummary.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {periodSummary.net >= 0 ? '+' : '−'} {fmt(Math.abs(periodSummary.net))}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
