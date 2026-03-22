@@ -264,13 +264,13 @@ function AccountRow({ account, mobile }) {
 
 export default function DashboardPage({ user, onLogout }) {
   const [accounts,     setAccounts]     = useState([]);
+  const [budgets,      setBudgets]      = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [loadingMore,  setLoadingMore]  = useState(false);
   const [hasMore,      setHasMore]      = useState(false);
   const [fireflyPage,  setFireflyPage]  = useState(1);
   const [error,        setError]        = useState('');
-  // totalLoaded tracks how many tx have been fetched from Firefly across all pages
 
   const [filterCategory,   setFilterCategory]   = useState(null);
   const [filterBudget,     setFilterBudget]      = useState(null);
@@ -278,6 +278,8 @@ export default function DashboardPage({ user, onLogout }) {
   const [filterDestination,setFilterDestination] = useState(null);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
+  const [categoriesOpen,   setCategoriesOpen]   = useState(false);
+  const [tagsOpen,         setTagsOpen]         = useState(false);
 
   // Detect mobile (< 768px) — re-checked on resize
   const [mobile, setMobile] = useState(() => window.innerWidth < 768);
@@ -290,14 +292,16 @@ export default function DashboardPage({ user, onLogout }) {
   useEffect(() => {
     async function load() {
       try {
-        const [acctRes, txRes] = await Promise.all([
+        const [acctRes, txRes, budgetList] = await Promise.all([
           firefly.accounts('asset'),
           firefly.transactionPage(1),
+          firefly.budgets(),
         ]);
         setAccounts(acctRes.data || []);
         setTransactions(dedupe(txRes.data));
         setHasMore(txRes.hasMore);
         setFireflyPage(1);
+        setBudgets(budgetList);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -363,6 +367,29 @@ export default function DashboardPage({ user, onLogout }) {
 
   const hasFilters = filterCategory || filterBudget || filterTag || filterDestination;
 
+  // Derive category/tag summaries from ALL loaded transactions (not filtered)
+  const categorySummary = useMemo(() => {
+    const map = {};
+    transactions.forEach(tx => {
+      const split = tx.attributes?.transactions?.[0] || {};
+      if (split.type !== 'withdrawal') return;
+      const cat = split.category_name || 'Uncategorized';
+      map[cat] = (map[cat] || 0) + parseFloat(split.amount || 0);
+    });
+    return Object.entries(map).sort(([,a],[,b]) => b - a);
+  }, [transactions]);
+
+  const tagSummary = useMemo(() => {
+    const map = {};
+    transactions.forEach(tx => {
+      const split = tx.attributes?.transactions?.[0] || {};
+      (split.tags || []).forEach(tag => {
+        map[tag] = (map[tag] || 0) + parseFloat(split.amount || 0);
+      });
+    });
+    return Object.entries(map).sort(([,a],[,b]) => b - a);
+  }, [transactions]);
+
   const handlers = {
     onFilterCategory:    v => applyFilter(setFilterCategory, v),
     onFilterBudget:      v => applyFilter(setFilterBudget, v),
@@ -401,6 +428,30 @@ export default function DashboardPage({ user, onLogout }) {
           <p className="text-stone-400 text-sm py-12 text-center">Loading…</p>
         ) : (
           <>
+            {/* ── Budget strip ── */}
+            {budgets.length > 0 && (
+              <section className="px-4 sm:px-0">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {budgets.map(b => {
+                    const name = b.attributes?.name || '—';
+                    const spent = b.spent || 0;
+                    const isActive = filterBudget === name;
+                    return (
+                      <button key={b.id} onClick={() => applyFilter(setFilterBudget, isActive ? null : name)}
+                        className={`text-left rounded-lg border px-4 py-3 transition-colors
+                          ${isActive ? 'bg-stone-800 border-stone-800 text-white' : 'bg-white border-stone-200 hover:border-stone-400'}`}>
+                        <p className={`text-xs uppercase tracking-wide mb-1 ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>{name}</p>
+                        <p className={`text-base font-semibold tabular-nums ${isActive ? 'text-white' : 'text-red-600'}`}>
+                          − {fmt(spent)}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* ── Active filters ── */}
             {hasFilters && (
               <div className="flex items-center gap-2 flex-wrap px-4">
@@ -534,6 +585,61 @@ export default function DashboardPage({ user, onLogout }) {
                 </div>
               )}
             </section>
+
+            {/* ── Categories ── */}
+            <section>
+              <button onClick={() => setCategoriesOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
+                  Categories
+                </h2>
+                <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
+                  {categoriesOpen ? '▲' : '▼'}
+                </span>
+              </button>
+              {categoriesOpen && (
+                <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+                  {categorySummary.map(([cat, spent]) => (
+                    <button key={cat} onClick={() => applyFilter(setFilterCategory, filterCategory === cat ? null : cat)}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
+                        ${filterCategory === cat ? 'bg-stone-50' : ''}`}>
+                      <span className={`text-sm ${filterCategory === cat ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{cat}</span>
+                      <span className="text-sm tabular-nums text-red-600">− {fmt(spent)}</span>
+                    </button>
+                  ))}
+                  {categorySummary.length === 0 && <p className="py-8 text-center text-stone-300 text-sm">No categories found.</p>}
+                </div>
+              )}
+            </section>
+
+            {/* ── Tags ── */}
+            {tagSummary.length > 0 && (
+              <section>
+                <button onClick={() => setTagsOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
+                    Tags
+                  </h2>
+                  <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
+                    {tagsOpen ? '▲' : '▼'}
+                  </span>
+                </button>
+                {tagsOpen && (
+                  <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+                    <div className="flex flex-wrap gap-2 px-4 py-3">
+                      {tagSummary.map(([tag, spent]) => (
+                        <button key={tag} onClick={() => applyFilter(setFilterTag, filterTag === tag ? null : tag)}
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs transition-colors
+                            ${filterTag === tag ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
+                          <span>{tag}</span>
+                          <span className="tabular-nums opacity-70">− {fmt(spent)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
           </>
         )}
       </main>
