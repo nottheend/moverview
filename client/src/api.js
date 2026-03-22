@@ -61,12 +61,14 @@ export const firefly = {
 
   // Fetch all budget limit periods in one call using the dedicated endpoint
   budgetPeriods: async () => {
-    const res = await request(`/api/firefly/budget-limits?limit=200`);
+    const now   = new Date();
+    const start = new Date(now.getFullYear() - 2, 0, 1).toISOString().slice(0, 10);
+    const end   = new Date(now.getFullYear() + 1, 11, 31).toISOString().slice(0, 10);
+    const res = await request(`/api/firefly/budget-limits?limit=200&start=${start}&end=${end}`);
     const limits = res.data || [];
 
     const periodMap = {};
     limits.forEach(l => {
-      // Firefly returns timestamps like "2026-03-01T00:00:00+00:00" — slice to YYYY-MM-DD
       const start = (l.attributes?.start || '').slice(0, 10);
       const end   = (l.attributes?.end   || '').slice(0, 10);
       if (start && end) {
