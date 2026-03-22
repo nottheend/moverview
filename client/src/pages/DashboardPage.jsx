@@ -310,6 +310,7 @@ export default function DashboardPage({ user, onLogout }) {
       setTransactions(prev => dedupe([...prev, ...txRes.data]));
       setHasMore(txRes.hasMore);
       setFireflyPage(nextPage);
+      setPage(p => p + 1);
     } catch (err) {
       setError(err.message);
     } finally {
