@@ -66,8 +66,9 @@ export const firefly = {
 
     const periodMap = {};
     limits.forEach(l => {
-      const start = l.attributes?.start;
-      const end   = l.attributes?.end;
+      // Firefly returns timestamps like "2026-03-01T00:00:00+00:00" — slice to YYYY-MM-DD
+      const start = (l.attributes?.start || '').slice(0, 10);
+      const end   = (l.attributes?.end   || '').slice(0, 10);
       if (start && end) {
         const key = `${start}|${end}`;
         if (!periodMap[key]) periodMap[key] = { start, end };

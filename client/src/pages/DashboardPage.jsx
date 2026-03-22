@@ -1,40 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { firefly } from '../api.js';
 
-// ── Date range helpers ────────────────────────────────────────────────────────
-
-function toISO(d) { return d.toISOString().slice(0, 10); }
-
-function getPreset(key) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  switch (key) {
-    case 'last30': {
-      const s = new Date(); s.setDate(s.getDate() - 30);
-      return { start: toISO(s), end: toISO(now), label: 'Last 30 days' };
-    }
-    case 'thisMonth':
-      return { start: toISO(new Date(y, m, 1)), end: toISO(now), label: 'This month' };
-    case 'lastMonth': {
-      const s = new Date(y, m - 1, 1);
-      const e = new Date(y, m, 0);
-      return { start: toISO(s), end: toISO(e), label: 'Last month' };
-    }
-    case 'thisYear':
-      return { start: toISO(new Date(y, 0, 1)), end: toISO(now), label: 'This year' };
-    default:
-      return getPreset('last30');
-  }
-}
-
-const PRESETS = [
-  { key: 'last30',    label: 'Last 30 days' },
-  { key: 'thisMonth', label: 'This month' },
-  { key: 'lastMonth', label: 'Last month' },
-  { key: 'thisYear',  label: 'This year' },
-];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(amount, symbol = '€') {
@@ -55,6 +21,15 @@ function fmtDateShort(dateStr) {
     day: '2-digit', month: '2-digit',
   });
 }
+
+// For period labels — always include year
+function fmtDatePeriod(dateStr) {
+  return new Date(dateStr).toLocaleDateString('de-DE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+}
+
+// Safely extract YYYY-MM-DD from either "2026-03-01" or "2026-03-01T00:00:00+00:00"
 
 function txType(split) {
   if (split.type === 'withdrawal') return 'expense';
@@ -290,17 +265,16 @@ export default function DashboardPage({ user, onLogout }) {
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState('');
 
-  const [datePreset,   setDatePreset]   = useState('last30');
   const [customStart,  setCustomStart]  = useState('');
   const [customEnd,    setCustomEnd]    = useState('');
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const pickerRef = useRef(null);
 
   const activeDateRange = useMemo(() => {
-    if (datePreset === 'custom' && customStart && customEnd)
-      return { start: customStart, end: customEnd, label: `${fmtDateShort(customStart)} – ${fmtDateShort(customEnd)}` };
-    return getPreset(datePreset);
-  }, [datePreset, customStart, customEnd]);
+    if (customStart && customEnd)
+      return { start: customStart, end: customEnd, label: `${fmtDatePeriod(customStart)} – ${fmtDatePeriod(customEnd)}` };
+    return null;
+  }, [customStart, customEnd]);
 
   const [filterCategory,   setFilterCategory]   = useState(null);
   const [filterBudget,     setFilterBudget]      = useState(null);
@@ -321,12 +295,19 @@ export default function DashboardPage({ user, onLogout }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Fetch budget periods once on mount
+  // Fetch budget periods once on mount, auto-select most recent
   useEffect(() => {
-    firefly.budgetPeriods().then(setBudgetPeriods).catch(() => {});
+    firefly.budgetPeriods().then(periods => {
+      setBudgetPeriods(periods);
+      if (periods.length > 0 && !customStart) {
+        setCustomStart(periods[0].start);
+        setCustomEnd(periods[0].end);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
+    if (!activeDateRange) return;
     async function load() {
       setLoading(true);
       setTransactions([]);
@@ -469,38 +450,32 @@ export default function DashboardPage({ user, onLogout }) {
                       className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 bg-white border border-stone-400 rounded px-3 py-1.5 hover:border-stone-600 transition-colors whitespace-nowrap"
                     >
                       <span>📅</span>
-                      {activeDateRange.label}
+                      {activeDateRange ? activeDateRange.label : 'Loading periods…'}
                       <span className="text-stone-400 text-xs">{pickerOpen ? '▲' : '▼'}</span>
                     </button>
                     {pickerOpen && (
                       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white border border-stone-200 rounded-lg shadow-lg z-50 min-w-[240px] overflow-hidden">
-                        {PRESETS.map(p => (
-                          <button key={p.key}
-                            onClick={() => { setDatePreset(p.key); setPickerOpen(false); }}
-                            className={`w-full text-left px-4 py-2.5 text-sm border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
-                              ${datePreset === p.key ? 'font-semibold text-stone-800 bg-stone-50' : 'text-stone-600'}`}>
-                            {p.label}
-                          </button>
-                        ))}
-                        {budgetPeriods.length > 0 && (
+                        {budgetPeriods.length > 0 ? (
                           <>
-                            <div className="px-4 py-2 border-t border-stone-100 bg-stone-50">
+                            <div className="px-4 py-2 bg-stone-50 border-b border-stone-100">
                               <p className="text-xs text-stone-400 uppercase tracking-wide">Budget periods</p>
                             </div>
                             {budgetPeriods.map(p => {
-                              const label = `${fmtDateShort(p.start)} – ${fmtDateShort(p.end)}`;
+                              const label = `${fmtDatePeriod(p.start)} – ${fmtDatePeriod(p.end)}`;
                               const key = `${p.start}|${p.end}`;
-                              const isActive = datePreset === 'custom' && customStart === p.start && customEnd === p.end;
+                              const isActive = customStart === p.start && customEnd === p.end;
                               return (
                                 <button key={key}
-                                  onClick={() => { setDatePreset('custom'); setCustomStart(p.start); setCustomEnd(p.end); setPickerOpen(false); }}
-                                  className={`w-full text-left px-4 py-2 text-sm border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
+                                  onClick={() => { setCustomStart(p.start); setCustomEnd(p.end); setPickerOpen(false); }}
+                                  className={`w-full text-left px-4 py-2.5 text-sm border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
                                     ${isActive ? 'font-semibold text-stone-800 bg-stone-50' : 'text-stone-600'}`}>
                                   {label}
                                 </button>
                               );
                             })}
                           </>
+                        ) : (
+                          <p className="px-4 py-3 text-sm text-stone-400">No budget periods found.</p>
                         )}
                         {/* Custom range */}
                         <div className="px-4 py-3 border-t border-stone-100">
@@ -512,7 +487,7 @@ export default function DashboardPage({ user, onLogout }) {
                               className="text-xs border border-stone-200 rounded px-2 py-1 text-stone-600 w-full" />
                             <button
                               disabled={!customStart || !customEnd}
-                              onClick={() => { setDatePreset('custom'); setPickerOpen(false); }}
+                              onClick={() => { setPickerOpen(false); }}
                               className="text-xs bg-stone-800 text-white rounded px-3 py-1.5 hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
                               Apply
                             </button>
