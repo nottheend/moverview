@@ -397,6 +397,15 @@ export default function DashboardPage({ user, onLogout }) {
     onFilterDestination: v => applyFilter(setFilterDestination, v),
   };
 
+  const dateRange = useMemo(() => {
+    if (transactions.length === 0) return null;
+    const dates = transactions.map(tx => tx.attributes?.transactions?.[0]?.date?.slice(0, 10)).filter(Boolean);
+    const min = dates.reduce((a, b) => a < b ? a : b);
+    const max = dates.reduce((a, b) => a > b ? a : b);
+    if (min === max) return fmtDateShort(min);
+    return `${fmtDateShort(min)} – ${fmtDateShort(max)}`;
+  }, [transactions]);
+
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
 
@@ -409,6 +418,10 @@ export default function DashboardPage({ user, onLogout }) {
             {loading ? 'Loading…' : loadingMore ? `${transactions.length} loaded…` : `${transactions.length} loaded`}
             {!loading && !loadingMore && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
           </span>
+          {!loading && !loadingMore && dateRange && <>
+            <span className="text-stone-300 shrink-0 hidden sm:inline">·</span>
+            <span className="text-xs text-stone-500 shrink-0 hidden sm:inline">{dateRange}</span>
+          </>}
         </div>
         <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
         <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
