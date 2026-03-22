@@ -77,6 +77,8 @@ export const firefly = {
       }
     });
 
-    return Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
+    return Object.values(periodMap)
+      .filter(p => p.start >= '2024-11-01')
+      .sort((a, b) => b.start.localeCompare(a.start));
   },
 };
