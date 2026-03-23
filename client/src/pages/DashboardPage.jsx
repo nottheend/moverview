@@ -53,6 +53,16 @@ function TagDot() {
   return <span style={{width:5,height:5,borderRadius:'50%',background:'#b8a06a',flexShrink:0,display:'inline-block'}} />;
 }
 
+function SectionSpinner() {
+  return (
+    <span className="animate-spin" style={{
+      width:11, height:11, flexShrink:0,
+      border:'1.5px solid #d6d3d1', borderTopColor:'#78716c',
+      borderRadius:'50%', display:'inline-block',
+    }} />
+  );
+}
+
 // ── Bill chip — ticket style ──────────────────────────────────────────────────
 
 function BillChip({ name, onClick }) {
