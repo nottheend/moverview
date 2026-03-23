@@ -257,13 +257,16 @@ function AccountRow({ account, mobile }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout }) {
-  const [accounts,     setAccounts]     = useState([]);
-  const [budgets,      setBudgets]      = useState([]);
-  const [bills,        setBills]        = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [budgetPeriods,setBudgetPeriods]= useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState('');
+  const [accounts,      setAccounts]      = useState([]);
+  const [budgets,       setBudgets]       = useState([]);
+  const [bills,         setBills]         = useState([]);
+  const [transactions,  setTransactions]  = useState([]);
+  const [budgetPeriods, setBudgetPeriods] = useState([]);
+  const [loadingTx,     setLoadingTx]     = useState(true);
+  const [loadingMeta,   setLoadingMeta]   = useState(true);
+  const [error,         setError]         = useState('');
+
+  const loading = loadingTx;
 
   const [customStart,  setCustomStart]  = useState('');
   const [customEnd,    setCustomEnd]    = useState('');
@@ -280,6 +283,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [filterBudget,     setFilterBudget]      = useState(null);
   const [filterBill,       setFilterBill]        = useState(null);
   const [filterTag,        setFilterTag]         = useState(null);
+  const [filterType,       setFilterType]        = useState(null); // 'expense' | 'income' | 'transfer' | null
   const [filterDestination,setFilterDestination] = useState(null);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
@@ -308,29 +312,36 @@ export default function DashboardPage({ user, onLogout }) {
 
   useEffect(() => {
     if (!activeDateRange) return;
-    async function load() {
-      setLoading(true);
-      setTransactions([]);
-      setPage(1);
-      try {
-        const { start, end } = activeDateRange;
-        const [acctRes, txData, budgetList, billList] = await Promise.all([
-          firefly.accounts('asset'),
-          firefly.transactions(start, end),
-          firefly.budgets(start, end),
-          firefly.bills(),
-        ]);
-        setAccounts(acctRes.data || []);
-        setTransactions(dedupe(txData));
-        setBudgets(budgetList);
-        setBills(billList);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    const { start, end } = activeDateRange;
+
+    // Reset
+    setTransactions([]);
+    setPage(1);
+    setLoadingTx(true);
+    setLoadingMeta(true);
+
+    // 1. Transactions first — show immediately when ready
+    firefly.transactions(start, end)
+      .then(txData => setTransactions(dedupe(txData)))
+      .catch(err => setError(err.message))
+      .finally(() => setLoadingTx(false));
+
+    // 2. Accounts — background
+    firefly.accounts('asset')
+      .then(res => setAccounts(res.data || []))
+      .catch(() => {});
+
+    // 3. Budgets — background
+    firefly.budgets(start, end)
+      .then(setBudgets)
+      .catch(() => {});
+
+    // 4. Bills — background
+    firefly.bills()
+      .then(setBills)
+      .catch(() => {})
+      .finally(() => setLoadingMeta(false));
+
   }, [activeDateRange]);
 
 
@@ -352,7 +363,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   function clearAll() {
     setFilterCategory(null); setFilterBudget(null); setFilterBill(null);
-    setFilterTag(null); setFilterDestination(null);
+    setFilterTag(null); setFilterType(null); setFilterDestination(null);
     setPage(1);
   }
 
@@ -360,20 +371,21 @@ export default function DashboardPage({ user, onLogout }) {
     const split = tx.attributes?.transactions?.[0] || {};
     const type  = txType(split);
     const dest  = type === 'transfer' || type === 'expense' ? split.destination_name : split.source_name;
-    if (filterCategory    && split.category_name !== filterCategory)       return false;
-    if (filterBudget      && split.budget_name   !== filterBudget)         return false;
-    if (filterBill        && split.bill_name     !== filterBill)           return false;
-    if (filterTag         && !(split.tags || []).includes(filterTag))      return false;
-    if (filterDestination && dest                !== filterDestination)    return false;
+    if (filterType        && type                !== filterType)                    return false;
+    if (filterCategory    && split.category_name !== filterCategory)               return false;
+    if (filterBudget      && split.budget_name   !== filterBudget)                 return false;
+    if (filterBill        && split.bill_name     !== filterBill)                   return false;
+    if (filterTag         && !(split.tags || []).includes(filterTag))              return false;
+    if (filterDestination && dest                !== filterDestination)            return false;
     return true;
-  }), [transactions, filterCategory, filterBudget, filterBill, filterTag, filterDestination]);
+  }), [transactions, filterType, filterCategory, filterBudget, filterBill, filterTag, filterDestination]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageStart  = (page - 1) * PAGE_SIZE;
   const pageTxs    = filtered.slice(pageStart, pageStart + PAGE_SIZE);
   const pageGroups = groupByDate(pageTxs);
 
-  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterDestination;
+  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterType || filterDestination;
 
   // Derive category/tag summaries from ALL loaded transactions (not filtered)
   const categorySummary = useMemo(() => {
@@ -399,15 +411,16 @@ export default function DashboardPage({ user, onLogout }) {
   }, [transactions]);
 
   const periodSummary = useMemo(() => {
-    let income = 0, expense = 0;
+    let income = 0, expense = 0, transfer = 0;
     transactions.forEach(tx => {
-      const split = tx.attributes?.transactions?.[0] || {};
-      const type  = txType(split);
+      const split  = tx.attributes?.transactions?.[0] || {};
+      const type   = txType(split);
       const amount = parseFloat(split.amount || 0);
-      if (type === 'income')  income  += amount;
-      if (type === 'expense') expense += amount;
+      if (type === 'income')   income   += amount;
+      if (type === 'expense')  expense  += amount;
+      if (type === 'transfer') transfer += amount;
     });
-    return { income, expense, net: income - expense };
+    return { income, expense, transfer, net: income - expense };
   }, [transactions]);
 
   const handlers = {
@@ -428,8 +441,9 @@ export default function DashboardPage({ user, onLogout }) {
           <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
-            {loading ? 'Loading…' : `${transactions.length} transactions`}
-            {!loading && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
+            {loadingTx ? 'Loading transactions…' : `${transactions.length} transactions`}
+              {!loadingTx && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
+              {!loadingTx && loadingMeta && ' · loading details…'}
           </span>
         </div>
         <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
@@ -447,7 +461,7 @@ export default function DashboardPage({ user, onLogout }) {
         )}
 
         {loading ? (
-          <p className="text-stone-400 text-sm py-12 text-center">Loading…</p>
+          <p className="text-stone-400 text-sm py-12 text-center">Loading transactions…</p>
         ) : (
           <>
             {/* ── Budget strip ── */}
@@ -512,23 +526,26 @@ export default function DashboardPage({ user, onLogout }) {
                 </div>
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
 
-                {/* Period summary */}
-                {!loading && (
+                {/* Period summary — clickable type filters */}
+                {transactions.length > 0 && (
                   <div className="flex rounded-lg border border-stone-200 bg-white overflow-hidden mb-4">
-                    <div className="flex-1 px-4 py-3 border-r border-stone-100">
-                      <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">Income</p>
-                      <p className="text-base font-bold tabular-nums text-emerald-600">+ {fmt(periodSummary.income)}</p>
-                    </div>
-                    <div className="flex-1 px-4 py-3 border-r border-stone-100">
-                      <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">Expenses</p>
-                      <p className="text-base font-bold tabular-nums text-red-600">− {fmt(periodSummary.expense)}</p>
-                    </div>
-                    <div className="flex-1 px-4 py-3">
-                      <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">Net</p>
-                      <p className={`text-base font-bold tabular-nums ${periodSummary.net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {periodSummary.net >= 0 ? '+' : '−'} {fmt(Math.abs(periodSummary.net))}
-                      </p>
-                    </div>
+                    {[
+                      { key: 'income',   label: 'Income',    value: `+ ${fmt(periodSummary.income)}`,              color: 'text-emerald-600' },
+                      { key: 'expense',  label: 'Expenses',  value: `− ${fmt(periodSummary.expense)}`,             color: 'text-red-600' },
+                      { key: 'transfer', label: 'Transfers', value: `⇄ ${fmt(periodSummary.transfer)}`,            color: 'text-indigo-600' },
+                      { key: null,       label: 'Net',       value: `${periodSummary.net >= 0 ? '+' : '−'} ${fmt(Math.abs(periodSummary.net))}`, color: periodSummary.net >= 0 ? 'text-emerald-600' : 'text-red-600' },
+                    ].map((item, i, arr) => {
+                      const isActive = filterType === item.key && item.key !== null;
+                      return (
+                        <button key={item.label}
+                          onClick={() => item.key && applyFilter(setFilterType, filterType === item.key ? null : item.key)}
+                          className={`flex-1 px-3 py-3 text-left transition-colors ${i < arr.length - 1 ? 'border-r border-stone-100' : ''}
+                            ${isActive ? 'bg-stone-50' : item.key ? 'hover:bg-stone-50 cursor-pointer' : 'cursor-default'}`}>
+                          <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">{item.label}</p>
+                          <p className={`text-sm font-bold tabular-nums ${isActive ? item.color : item.color}`}>{item.value}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
@@ -562,6 +579,7 @@ export default function DashboardPage({ user, onLogout }) {
                 {filterCategory    && <FilterPill label={filterCategory}    onClear={() => applyFilter(setFilterCategory, null)} />}
                 {filterBudget      && <FilterPill label={filterBudget}      onClear={() => applyFilter(setFilterBudget, null)} />}
                 {filterBill        && <FilterPill label={filterBill}        onClear={() => applyFilter(setFilterBill, null)} />}
+                {filterType        && <FilterPill label={filterType}        onClear={() => applyFilter(setFilterType, null)} />}
                 {filterTag         && <FilterPill label={filterTag}         onClear={() => applyFilter(setFilterTag, null)} />}
                 {filterDestination && <FilterPill label={`→ ${filterDestination}`} onClear={() => applyFilter(setFilterDestination, null)} />}
                 <button onClick={clearAll} className="text-xs text-stone-400 hover:text-stone-700 underline">
