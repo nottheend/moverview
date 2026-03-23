@@ -312,25 +312,74 @@ export default function DashboardPage({ user, onLogout }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // On mount: one pass fetches both the period-picker list AND the initial
-  // budget spent amounts — no duplicate /budgets or /budgets/{id}/limits calls.
-  useEffect(() => {
-    const now   = new Date();
-    const y     = now.getFullYear();
-    const m     = String(now.getMonth() + 1).padStart(2, '0');
-    const start = `${y}-${m}-01`;
-    const last  = new Date(y, now.getMonth() + 1, 0).getDate();
-    const end   = `${y}-${m}-${String(last).padStart(2, '0')}`;
+  // budgetsFetchedFor ref lets the date-range effect skip a redundant
+  // budgetsAndPeriods call when mount already fetched for the same range.
+  const budgetsFetchedFor = useRef(null);
 
-    firefly.budgetsAndPeriods(start, end).then(({ budgets: b, periods }) => {
-      setBudgetPeriods(periods);
-      setBudgets(b);
-      setLoadingBudgets(false); // pre-populate so the section isn't empty on first render
-      if (periods.length > 0 && !customStart) {
-        setCustomStart(periods[0].start);
-        setCustomEnd(periods[0].end);
-      }
-    }).catch(() => {});
+  // On mount: one fetch discovers periods AND pre-populates budgets with
+  // accurate spent amounts for the first (most-recent) period.
+  // The date-range effect will see budgetsFetchedFor matches and skip its own call.
+  useEffect(() => {
+    (async () => {
+      try {
+        // Step 1: get the budget list to discover the most-recent period.
+        const budgetRes = await fetch('/api/firefly/budgets?limit=50', { credentials: 'include' });
+        const budgetJson = await budgetRes.json();
+        const budgetList = budgetJson.data || [];
+
+        // Step 2: discover periods via wide-window limits fetch.
+        const now = new Date();
+        const y = now.getFullYear();
+        const wideStart = `${y - 1}-01-01`;
+        const wideEnd   = `${y + 1}-12-31`;
+        const periodMap = {};
+        const limitsCache = {};
+        await Promise.all(budgetList.map(async b => {
+          try {
+            const r = await fetch(`/api/firefly/budgets/${b.id}/limits?limit=50&start=${wideStart}&end=${wideEnd}`, { credentials: 'include' });
+            const j = await r.json();
+            const data = j.data || [];
+            limitsCache[b.id] = data;
+            data.forEach(l => {
+              const s = (l.attributes?.start || '').slice(0, 10);
+              const e = (l.attributes?.end   || '').slice(0, 10);
+              if (s && e && s >= '2024-11-01') {
+                const key = `${s}|${e}`;
+                if (!periodMap[key]) periodMap[key] = { start: s, end: e };
+              }
+            });
+          } catch {}
+        }));
+        const periods = Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
+        setBudgetPeriods(periods);
+
+        if (periods.length > 0 && !customStart) {
+          const { start, end } = periods[0];
+          budgetsFetchedFor.current = `${start}|${end}`;
+          // Reuse limitsCache populated during period discovery — no extra fetches.
+          const withSpent = budgetList.map(b => {
+            try {
+              const limits = (limitsCache[b.id] || []).filter(l => {
+                const s = (l.attributes?.start || '').slice(0, 10);
+                const e = (l.attributes?.end   || '').slice(0, 10);
+                return s <= end && e >= start;
+              });
+              const spent = limits.reduce((sum, l) => {
+                const arr = l.attributes?.spent;
+                return sum + (Array.isArray(arr)
+                  ? arr.reduce((s, x) => s + parseFloat(x.sum || 0), 0)
+                  : parseFloat(arr || 0));
+              }, 0);
+              return { ...b, spent: Math.abs(spent) };
+            } catch { return { ...b, spent: 0 }; }
+          });
+          setBudgets(withSpent);
+          setLoadingBudgets(false);
+          setCustomStart(start);
+          setCustomEnd(end);
+        }
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -358,20 +407,26 @@ export default function DashboardPage({ user, onLogout }) {
       .catch(() => {})
       .finally(() => setLoadingAccounts(false));
 
-    // 3. Budgets + period list — background (single merged pass, no duplicate /budgets call)
-    firefly.budgetsAndPeriods(start, end)
-      .then(({ budgets: b, periods }) => {
-        setBudgets(b);
-        setLoadingBudgets(false);
-        // Keep the period picker up-to-date in case new periods appeared
-        setBudgetPeriods(prev => {
-          const existing = new Set(prev.map(p => `${p.start}|${p.end}`));
-          const merged   = [...prev];
-          periods.forEach(p => { if (!existing.has(`${p.start}|${p.end}`)) merged.push(p); });
-          return merged.sort((a, b) => b.start.localeCompare(a.start));
-        });
-      })
-      .catch(() => {});
+    // 3. Budgets — skip if mount effect already fetched for this exact range.
+    const rangeKey = `${start}|${end}`;
+    if (budgetsFetchedFor.current === rangeKey) {
+      // Data already populated by mount effect; just clear the loading flag.
+      setLoadingBudgets(false);
+      budgetsFetchedFor.current = null; // allow future period changes to re-fetch
+    } else {
+      firefly.budgetsAndPeriods(start, end)
+        .then(({ budgets: b, periods }) => {
+          setBudgets(b);
+          setLoadingBudgets(false);
+          setBudgetPeriods(prev => {
+            const existing = new Set(prev.map(p => `${p.start}|${p.end}`));
+            const merged   = [...prev];
+            periods.forEach(p => { if (!existing.has(`${p.start}|${p.end}`)) merged.push(p); });
+            return merged.sort((a, b) => b.start.localeCompare(a.start));
+          });
+        })
+        .catch(() => {});
+    }
 
     // 4. Bills — background
     firefly.bills()
