@@ -35,45 +35,33 @@ export const firefly = {
     return res.data || [];
   },
 
-  budgets: async (startStr, endStr) => {
-    const res = await request(`/api/firefly/budgets?limit=50`);
-    const budgets = res.data || [];
-
-    const withSpent = await Promise.all(budgets.map(async (b) => {
-      try {
-        const limRes = await request(`/api/firefly/budgets/${b.id}/limits?limit=10&start=${startStr}&end=${endStr}`);
-        const limits = limRes.data || [];
-        const spent = limits.reduce((sum, l) => {
-          const spentArr = l.attributes?.spent;
-          const spentSum = Array.isArray(spentArr)
-            ? spentArr.reduce((s, entry) => s + parseFloat(entry.sum || 0), 0)
-            : parseFloat(spentArr || 0);
-          return sum + spentSum;
-        }, 0);
-        return { ...b, spent: Math.abs(spent) };
-      } catch {
-        return { ...b, spent: 0 };
-      }
-    }));
-
-    return withSpent;
-  },
-
-  // Fetch budget periods using per-budget limits endpoint (more reliable than /budget-limits)
-  budgetPeriods: async () => {
+  // Fetch budgets list + per-budget limits once with a wide window.
+  // Returns { budgets, periods } so callers can share the single pass.
+  // budgets : array enriched with .spent for the given [startStr, endStr]
+  // periods : sorted array of { start, end } for the date picker
+  budgetsAndPeriods: async (startStr, endStr) => {
     const now      = new Date();
     const thisYear = now.getFullYear();
-    const start    = `${thisYear - 1}-01-01`;
-    const end      = `${thisYear + 1}-12-31`;
+    // Wide window covers both the period picker (2-year lookback) and the
+    // spent calculation for [startStr, endStr] — the narrow slice is done
+    // client-side so we never need a second round-trip.
+    const wideStart = `${thisYear - 1}-01-01`;
+    const wideEnd   = `${thisYear + 1}-12-31`;
 
     const budgetRes = await request(`/api/firefly/budgets?limit=50`);
     const budgets   = budgetRes.data || [];
 
     const periodMap = {};
-    await Promise.all(budgets.map(async b => {
+
+    const withSpent = await Promise.all(budgets.map(async (b) => {
       try {
-        const limRes = await request(`/api/firefly/budgets/${b.id}/limits?limit=50&start=${start}&end=${end}`);
-        (limRes.data || []).forEach(l => {
+        const limRes = await request(
+          `/api/firefly/budgets/${b.id}/limits?limit=50&start=${wideStart}&end=${wideEnd}`
+        );
+        const limits = limRes.data || [];
+
+        // Collect period entries for the date picker
+        limits.forEach(l => {
           const s = (l.attributes?.start || '').slice(0, 10);
           const e = (l.attributes?.end   || '').slice(0, 10);
           if (s && e && s >= '2024-11-01') {
@@ -81,9 +69,30 @@ export const firefly = {
             if (!periodMap[key]) periodMap[key] = { start: s, end: e };
           }
         });
-      } catch { /* skip budget on error */ }
+
+        // Compute spent only for limits that fall within the requested window
+        const spent = limits
+          .filter(l => {
+            const s = (l.attributes?.start || '').slice(0, 10);
+            const e = (l.attributes?.end   || '').slice(0, 10);
+            return s <= endStr && e >= startStr;
+          })
+          .reduce((sum, l) => {
+            const spentArr = l.attributes?.spent;
+            const spentSum = Array.isArray(spentArr)
+              ? spentArr.reduce((s, entry) => s + parseFloat(entry.sum || 0), 0)
+              : parseFloat(spentArr || 0);
+            return sum + spentSum;
+          }, 0);
+
+        return { ...b, spent: Math.abs(spent) };
+      } catch {
+        return { ...b, spent: 0 };
+      }
     }));
 
-    return Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
+    const periods = Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
+
+    return { budgets: withSpent, periods };
   },
 };

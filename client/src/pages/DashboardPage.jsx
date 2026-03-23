@@ -299,10 +299,19 @@ export default function DashboardPage({ user, onLogout }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Fetch budget periods once on mount, auto-select most recent
+  // On mount: one pass fetches both the period-picker list AND the initial
+  // budget spent amounts — no duplicate /budgets or /budgets/{id}/limits calls.
   useEffect(() => {
-    firefly.budgetPeriods().then(periods => {
+    const now   = new Date();
+    const y     = now.getFullYear();
+    const m     = String(now.getMonth() + 1).padStart(2, '0');
+    const start = `${y}-${m}-01`;
+    const last  = new Date(y, now.getMonth() + 1, 0).getDate();
+    const end   = `${y}-${m}-${String(last).padStart(2, '0')}`;
+
+    firefly.budgetsAndPeriods(start, end).then(({ budgets: b, periods }) => {
       setBudgetPeriods(periods);
+      setBudgets(b); // pre-populate so the section isn't empty on first render
       if (periods.length > 0 && !customStart) {
         setCustomStart(periods[0].start);
         setCustomEnd(periods[0].end);
@@ -331,9 +340,18 @@ export default function DashboardPage({ user, onLogout }) {
       .then(res => setAccounts(res.data || []))
       .catch(() => {});
 
-    // 3. Budgets — background
-    firefly.budgets(start, end)
-      .then(setBudgets)
+    // 3. Budgets + period list — background (single merged pass, no duplicate /budgets call)
+    firefly.budgetsAndPeriods(start, end)
+      .then(({ budgets: b, periods }) => {
+        setBudgets(b);
+        // Keep the period picker up-to-date in case new periods appeared
+        setBudgetPeriods(prev => {
+          const existing = new Set(prev.map(p => `${p.start}|${p.end}`));
+          const merged   = [...prev];
+          periods.forEach(p => { if (!existing.has(`${p.start}|${p.end}`)) merged.push(p); });
+          return merged.sort((a, b) => b.start.localeCompare(a.start));
+        });
+      })
       .catch(() => {});
 
     // 4. Bills — background
