@@ -283,7 +283,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [filterBudget,     setFilterBudget]      = useState(null);
   const [filterBill,       setFilterBill]        = useState(null);
   const [filterTag,        setFilterTag]         = useState(null);
-  const [filterType,       setFilterType]        = useState(null); // 'expense' | 'income' | 'transfer' | null
+  const [filterTypes,      setFilterTypes]       = useState(new Set()); // set of 'expense'|'income'|'transfer'
   const [filterDestination,setFilterDestination] = useState(null);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
@@ -381,7 +381,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   function clearAll() {
     setFilterCategory(null); setFilterBudget(null); setFilterBill(null);
-    setFilterTag(null); setFilterType(null); setFilterDestination(null);
+    setFilterTag(null); setFilterTypes(new Set()); setFilterDestination(null);
     setPage(1);
   }
 
@@ -389,21 +389,21 @@ export default function DashboardPage({ user, onLogout }) {
     const split = tx.attributes?.transactions?.[0] || {};
     const type  = txType(split);
     const dest  = type === 'transfer' || type === 'expense' ? split.destination_name : split.source_name;
-    if (filterType        && type                !== filterType)                    return false;
+    if (filterTypes.size  && !filterTypes.has(type))                               return false;
     if (filterCategory    && split.category_name !== filterCategory)               return false;
     if (filterBudget      && split.budget_name   !== filterBudget)                 return false;
     if (filterBill        && split.bill_name     !== filterBill)                   return false;
     if (filterTag         && !(split.tags || []).includes(filterTag))              return false;
     if (filterDestination && dest                !== filterDestination)            return false;
     return true;
-  }), [transactions, filterType, filterCategory, filterBudget, filterBill, filterTag, filterDestination]);
+  }), [transactions, filterTypes, filterCategory, filterBudget, filterBill, filterTag, filterDestination]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageStart  = (page - 1) * PAGE_SIZE;
   const pageTxs    = filtered.slice(pageStart, pageStart + PAGE_SIZE);
   const pageGroups = groupByDate(pageTxs);
 
-  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterType || filterDestination;
+  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterTypes.size || filterDestination;
 
   // Derive category/tag summaries from ALL loaded transactions (not filtered)
   const categorySummary = useMemo(() => {
@@ -553,10 +553,18 @@ export default function DashboardPage({ user, onLogout }) {
                       { key: 'transfer', label: 'Transfers', value: `⇄ ${fmt(periodSummary.transfer)}`,            color: 'text-indigo-600' },
                       { key: null,       label: 'Net',       value: `${periodSummary.net >= 0 ? '+' : '−'} ${fmt(Math.abs(periodSummary.net))}`, color: periodSummary.net >= 0 ? 'text-emerald-600' : 'text-red-600' },
                     ].map((item, i, arr) => {
-                      const isActive = filterType === item.key && item.key !== null;
+                      const isActive = item.key !== null && filterTypes.has(item.key);
                       return (
                         <button key={item.label}
-                          onClick={() => item.key && applyFilter(setFilterType, filterType === item.key ? null : item.key)}
+                          onClick={() => {
+                            if (!item.key) return;
+                            setFilterTypes(prev => {
+                              const next = new Set(prev);
+                              next.has(item.key) ? next.delete(item.key) : next.add(item.key);
+                              return next;
+                            });
+                            setPage(1);
+                          }}
                           className={`flex-1 px-3 py-3 text-left transition-colors ${i < arr.length - 1 ? 'border-r border-stone-100' : ''}
                             ${isActive ? 'bg-stone-50' : item.key ? 'hover:bg-stone-50 cursor-pointer' : 'cursor-default'}`}>
                           <p className="text-xs text-stone-400 uppercase tracking-wide mb-1">{item.label}</p>
@@ -597,7 +605,9 @@ export default function DashboardPage({ user, onLogout }) {
                 {filterCategory    && <FilterPill label={filterCategory}    onClear={() => applyFilter(setFilterCategory, null)} />}
                 {filterBudget      && <FilterPill label={filterBudget}      onClear={() => applyFilter(setFilterBudget, null)} />}
                 {filterBill        && <FilterPill label={filterBill}        onClear={() => applyFilter(setFilterBill, null)} />}
-                {filterType        && <FilterPill label={filterType}        onClear={() => applyFilter(setFilterType, null)} />}
+                {[...filterTypes].map(t => (
+                  <FilterPill key={t} label={t} onClear={() => { setFilterTypes(prev => { const n = new Set(prev); n.delete(t); return n; }); setPage(1); }} />
+                ))}
                 {filterTag         && <FilterPill label={filterTag}         onClear={() => applyFilter(setFilterTag, null)} />}
                 {filterDestination && <FilterPill label={`→ ${filterDestination}`} onClear={() => applyFilter(setFilterDestination, null)} />}
                 <button onClick={clearAll} className="text-xs text-stone-400 hover:text-stone-700 underline">
