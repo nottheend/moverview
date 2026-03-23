@@ -613,7 +613,7 @@ export default function DashboardPage({ user, onLogout }) {
                   Transactions
                   {totalPages > 1 && <span className="ml-2 normal-case font-normal">· {page}/{totalPages}</span>}
                 </h2>
-                <div className="hidden sm:flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="inline-flex items-center text-xs bg-white text-stone-600 px-2 py-0.5 rounded border border-stone-400 tracking-tight">account</span>
                   <span className="inline-flex items-center text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full border border-stone-200">budget</span>
                   <span className="inline-flex items-center text-xs bg-white text-stone-500 border border-stone-400 rounded" style={{position:'relative',paddingLeft:12,paddingRight:12,paddingTop:2,paddingBottom:2}}>
