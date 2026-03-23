@@ -460,9 +460,17 @@ export default function DashboardPage({ user, onLogout }) {
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
             {loadingTx ? 'Loading transactions…' : `${transactions.length} transactions`}
-              {!loadingTx && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
-              {!loadingTx && loadingMeta && ' · loading details…'}
+            {!loadingTx && filtered.length !== transactions.length && ` · ${filtered.length} shown`}
           </span>
+          {(!loadingTx && loadingMeta) && (
+            <span className="animate-spin shrink-0" style={{
+              width: 12, height: 12,
+              border: '1.5px solid #d6d3d1',
+              borderTopColor: '#78716c',
+              borderRadius: '50%',
+              display: 'inline-block',
+            }} />
+          )}
         </div>
         <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
         <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
