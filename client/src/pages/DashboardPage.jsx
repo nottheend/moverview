@@ -262,8 +262,11 @@ export default function DashboardPage({ user, onLogout }) {
   const [bills,         setBills]         = useState([]);
   const [transactions,  setTransactions]  = useState([]);
   const [budgetPeriods, setBudgetPeriods] = useState([]);
-  const [loadingTx,     setLoadingTx]     = useState(true);
-  const [loadingMeta,   setLoadingMeta]   = useState(true);
+  const [loadingTx,       setLoadingTx]       = useState(true);
+  const [loadingMeta,     setLoadingMeta]     = useState(true);
+  const [loadingBudgets,  setLoadingBudgets]  = useState(true);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [loadingBills,    setLoadingBills]    = useState(true);
   const [error,         setError]         = useState('');
 
   const loading = loadingTx;
@@ -311,7 +314,8 @@ export default function DashboardPage({ user, onLogout }) {
 
     firefly.budgetsAndPeriods(start, end).then(({ budgets: b, periods }) => {
       setBudgetPeriods(periods);
-      setBudgets(b); // pre-populate so the section isn't empty on first render
+      setBudgets(b);
+      setLoadingBudgets(false); // pre-populate so the section isn't empty on first render
       if (periods.length > 0 && !customStart) {
         setCustomStart(periods[0].start);
         setCustomEnd(periods[0].end);
@@ -328,6 +332,9 @@ export default function DashboardPage({ user, onLogout }) {
     setPage(1);
     setLoadingTx(true);
     setLoadingMeta(true);
+    setLoadingBudgets(true);
+    setLoadingAccounts(true);
+    setLoadingBills(true);
 
     // 1. Transactions first — show immediately when ready
     firefly.transactions(start, end)
@@ -338,12 +345,14 @@ export default function DashboardPage({ user, onLogout }) {
     // 2. Accounts — background
     firefly.accounts('asset')
       .then(res => setAccounts(res.data || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingAccounts(false));
 
     // 3. Budgets + period list — background (single merged pass, no duplicate /budgets call)
     firefly.budgetsAndPeriods(start, end)
       .then(({ budgets: b, periods }) => {
         setBudgets(b);
+        setLoadingBudgets(false);
         // Keep the period picker up-to-date in case new periods appeared
         setBudgetPeriods(prev => {
           const existing = new Set(prev.map(p => `${p.start}|${p.end}`));
@@ -358,7 +367,7 @@ export default function DashboardPage({ user, onLogout }) {
     firefly.bills()
       .then(setBills)
       .catch(() => {})
-      .finally(() => setLoadingMeta(false));
+      .finally(() => { setLoadingBills(false); setLoadingMeta(false); });
 
   }, [activeDateRange]);
 
@@ -550,7 +559,10 @@ export default function DashboardPage({ user, onLogout }) {
                   </div>
                   <div className="flex-1 h-px bg-stone-200" />
                 </div>
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-3">Budgets</h2>
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
+                  {loadingBudgets && <SectionSpinner />}
+                </div>
 
                 {/* Period summary — clickable type filters */}
                 {transactions.length > 0 && (
@@ -583,6 +595,9 @@ export default function DashboardPage({ user, onLogout }) {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
+                  {loadingBudgets && [1,2,3].map(i => (
+                    <div key={i} className="animate-pulse h-8 rounded-full bg-stone-100 border border-stone-200" style={{width: 64 + i * 18}} />
+                  ))}
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
                     const spent = b.spent || 0;
@@ -684,9 +699,10 @@ export default function DashboardPage({ user, onLogout }) {
                 onClick={() => setAccountsOpen(o => !o)}
                 className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group"
               >
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
-                  Konten
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">Konten</h2>
+                  {loadingAccounts && <SectionSpinner />}
+                </div>
                 <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
                   {accountsOpen ? '▲' : '▼'}
                 </span>
@@ -746,13 +762,14 @@ export default function DashboardPage({ user, onLogout }) {
             </section>
 
             {/* ── Bills ── */}
-            {bills.length > 0 && (
+            {(bills.length > 0 || loadingBills) && (
               <section>
                 <button onClick={() => setBillsOpen(o => !o)}
                   className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
-                    Bills
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">Bills</h2>
+                    {loadingBills && <SectionSpinner />}
+                  </div>
                   <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
                     {billsOpen ? '▲' : '▼'}
                   </span>
