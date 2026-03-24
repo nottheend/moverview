@@ -660,9 +660,6 @@ export default function DashboardPage({ user, onLogout }) {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  {loadingBudgets && [1,2,3].map(i => (
-                    <div key={i} className="animate-pulse h-8 rounded-full bg-stone-100 border border-stone-200" style={{width: 64 + i * 18}} />
-                  ))}
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
                     const spent = b.spent || 0;
@@ -674,7 +671,7 @@ export default function DashboardPage({ user, onLogout }) {
                             ? 'bg-stone-800 border-stone-800 text-white'
                             : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
                         <span>{name}</span>
-                        {spent > 0 && (
+                        {spent > 0 && !loadingBudgets && (
                           <span className={`text-xs tabular-nums ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
                             {fmt(spent)}
                           </span>
