@@ -39,28 +39,31 @@ export const firefly = {
   // Returns { budgets, periods } so callers can share the single pass.
   // budgets : array enriched with .spent for the given [startStr, endStr]
   // periods : sorted array of { start, end } for the date picker
-  budgetsAndPeriods: async (startStr, endStr) => {
+  // Fetch budget list immediately (fast), then fire per-budget limits calls.
+  // onBudgetsReady(budgets)  — called once with name-only list (~150ms)
+  // onBudgetResolved(budget) — called per-budget as each limits call finishes
+  // Returns a promise that resolves with { periods } when all limits are done.
+  budgetsAndPeriods: async (startStr, endStr, { onBudgetsReady, onBudgetResolved } = {}) => {
     const now      = new Date();
     const thisYear = now.getFullYear();
-    // Wide window covers both the period picker (2-year lookback) and the
-    // spent calculation for [startStr, endStr] — the narrow slice is done
-    // client-side so we never need a second round-trip.
     const wideStart = `${thisYear - 1}-01-01`;
     const wideEnd   = `${thisYear + 1}-12-31`;
 
     const budgetRes = await request(`/api/firefly/budgets?limit=50`);
     const budgets   = budgetRes.data || [];
 
+    // Notify caller with name-only list right away so pills render immediately
+    if (onBudgetsReady) onBudgetsReady(budgets);
+
     const periodMap = {};
 
-    const withSpent = await Promise.all(budgets.map(async (b) => {
+    await Promise.all(budgets.map(async (b) => {
       try {
         const limRes = await request(
           `/api/firefly/budgets/${b.id}/limits?limit=50&start=${wideStart}&end=${wideEnd}`
         );
         const limits = limRes.data || [];
 
-        // Collect period entries for the date picker
         limits.forEach(l => {
           const s = (l.attributes?.start || '').slice(0, 10);
           const e = (l.attributes?.end   || '').slice(0, 10);
@@ -70,7 +73,6 @@ export const firefly = {
           }
         });
 
-        // Compute spent only for limits that fall within the requested window
         const spent = limits
           .filter(l => {
             const s = (l.attributes?.start || '').slice(0, 10);
@@ -85,14 +87,14 @@ export const firefly = {
             return sum + spentSum;
           }, 0);
 
-        return { ...b, spent: Math.abs(spent) };
+        // Notify caller as each budget resolves individually
+        if (onBudgetResolved) onBudgetResolved({ ...b, spent: Math.abs(spent) });
       } catch {
-        return { ...b, spent: 0 };
+        if (onBudgetResolved) onBudgetResolved({ ...b, spent: 0 });
       }
     }));
 
     const periods = Object.values(periodMap).sort((a, b) => b.start.localeCompare(a.start));
-
-    return { budgets: withSpent, periods };
+    return { periods };
   },
 };

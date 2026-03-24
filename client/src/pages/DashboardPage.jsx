@@ -348,19 +348,29 @@ export default function DashboardPage({ user, onLogout }) {
       .catch(() => {})
       .finally(() => setLoadingAccounts(false));
 
-    // 3. Budgets + period picker — background, never blocks transactions
-    firefly.budgetsAndPeriods(start, end)
-      .then(({ budgets: b, periods }) => {
-        setBudgets(b);
-        setLoadingBudgets(false);
-        setBudgetPeriods(prev => {
-          const existing = new Set(prev.map(p => `${p.start}|${p.end}`));
-          const merged   = [...prev];
-          periods.forEach(p => { if (!existing.has(`${p.start}|${p.end}`)) merged.push(p); });
-          return merged.sort((a, b) => b.start.localeCompare(a.start));
+    // 3. Budgets — name-list renders immediately, amounts fill in per-budget
+    firefly.budgetsAndPeriods(start, end, {
+      onBudgetsReady: (list) => {
+        // Seed with name-only entries so pills are laid out right away
+        setBudgets(list.map(b => ({ ...b, spent: null })));
+      },
+      onBudgetResolved: (b) => {
+        setBudgets(prev => prev.map(p => p.id === b.id ? b : p));
+        setLoadingBudgets(prev => {
+          // Clear spinner once every budget has a real spent value (not null)
+          // We check after this update so use a timeout trick via setState callback
+          return prev;
         });
-      })
-      .catch(() => {});
+      },
+    }).then(({ periods }) => {
+      setLoadingBudgets(false);
+      setBudgetPeriods(prev => {
+        const existing = new Set(prev.map(p => `${p.start}|${p.end}`));
+        const merged   = [...prev];
+        periods.forEach(p => { if (!existing.has(`${p.start}|${p.end}`)) merged.push(p); });
+        return merged.sort((a, b) => b.start.localeCompare(a.start));
+      });
+    }).catch(() => { setLoadingBudgets(false); });
 
     // 4. Bills — background
     firefly.bills()
@@ -499,7 +509,7 @@ export default function DashboardPage({ user, onLogout }) {
         ) : (
           <>
             {/* ── Budget strip ── */}
-            {budgets.length > 0 && (
+            {!loading && (
               <section className="px-4 sm:px-0">
                 {/* Date picker */}
                 <div className="flex items-center gap-3 mb-4">
@@ -596,7 +606,7 @@ export default function DashboardPage({ user, onLogout }) {
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
-                    const spent = b.spent || 0;
+                    const spent = b.spent;  // null = still loading, 0+ = resolved
                     const isActive = filterBudget === name;
                     return (
                       <button key={b.id} onClick={() => applyFilter(setFilterBudget, isActive ? null : name)}
@@ -605,7 +615,7 @@ export default function DashboardPage({ user, onLogout }) {
                             ? 'bg-stone-800 border-stone-800 text-white'
                             : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
                         <span>{name}</span>
-                        {spent > 0 && !loadingBudgets && (
+                        {spent !== null && spent > 0 && (
                           <span className={`text-xs tabular-nums ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
                             {fmt(spent)}
                           </span>
