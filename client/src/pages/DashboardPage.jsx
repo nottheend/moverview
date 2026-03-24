@@ -571,11 +571,6 @@ export default function DashboardPage({ user, onLogout }) {
                   </div>
                   <div className="flex-1 h-px bg-stone-200" />
                 </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
-                  {loadingBudgets && <SectionSpinner label="loading amounts…" />}
-                </div>
-
                 {/* Period summary — clickable type filters */}
                 {transactions.length > 0 && (
                   <div className="flex rounded-lg border border-stone-200 bg-white overflow-hidden mb-4">
@@ -606,6 +601,10 @@ export default function DashboardPage({ user, onLogout }) {
                     })}
                   </div>
                 )}
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
+                  {loadingBudgets && <SectionSpinner label="loading amounts…" />}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
                     const name = b.attributes?.name || '—';
@@ -618,11 +617,14 @@ export default function DashboardPage({ user, onLogout }) {
                             ? 'bg-stone-800 border-stone-800 text-white'
                             : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
                         <span>{name}</span>
-                        {spent !== null && spent > 0 && (
-                          <span className={`text-xs tabular-nums ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
-                            {fmt(spent)}
-                          </span>
-                        )}
+                        {spent === null
+                          ? <span className="animate-spin" style={{width:9,height:9,flexShrink:0,border:'1.5px solid #d6d3d1',borderTopColor:'#292524',borderRadius:'50%',display:'inline-block'}} />
+                          : spent > 0 && (
+                            <span className={`text-xs tabular-nums ${isActive ? 'text-stone-300' : 'text-stone-400'}`}>
+                              {fmt(spent)}
+                            </span>
+                          )
+                        }
                       </button>
                     );
                   })}
