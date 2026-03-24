@@ -53,13 +53,16 @@ function TagDot() {
   return <span style={{width:5,height:5,borderRadius:'50%',background:'#b8a06a',flexShrink:0,display:'inline-block'}} />;
 }
 
-function SectionSpinner() {
+function SectionSpinner({ label }) {
   return (
-    <span className="animate-spin" style={{
-      width:11, height:11, flexShrink:0,
-      border:'1.5px solid #d6d3d1', borderTopColor:'#78716c',
-      borderRadius:'50%', display:'inline-block',
-    }} />
+    <span style={{display:'inline-flex', alignItems:'center', gap:5}}>
+      <span className="animate-spin" style={{
+        width:13, height:13, flexShrink:0,
+        border:'2px solid #d6d3d1', borderTopColor:'#292524',
+        borderRadius:'50%', display:'inline-block',
+      }} />
+      {label && <span style={{fontSize:11, color:'#78716c'}}>{label}</span>}
+    </span>
   );
 }
 
@@ -570,7 +573,7 @@ export default function DashboardPage({ user, onLogout }) {
                 </div>
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
-                  {loadingBudgets && <SectionSpinner />}
+                  {loadingBudgets && <SectionSpinner label="loading amounts…" />}
                 </div>
 
                 {/* Period summary — clickable type filters */}
