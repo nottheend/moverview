@@ -426,6 +426,18 @@ export default function DashboardPage({ user, onLogout }) {
 
   const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterTypes.size || filterDestination;
 
+  const filteredSummary = useMemo(() => {
+    let income = 0, expense = 0;
+    filtered.forEach(tx => {
+      const split = tx.attributes?.transactions?.[0] || {};
+      const type  = txType(split);
+      const amount = parseFloat(split.amount || 0);
+      if (type === 'income')  income  += amount;
+      if (type === 'expense') expense += amount;
+    });
+    return { income, expense, net: income - expense };
+  }, [filtered]);
+
   // Derive category/tag summaries from ALL loaded transactions (not filtered)
   const categorySummary = useMemo(() => {
     const map = {};
@@ -647,6 +659,19 @@ export default function DashboardPage({ user, onLogout }) {
                 <button onClick={clearAll} className="text-xs text-stone-400 hover:text-stone-700 underline">
                   Clear all
                 </button>
+                <span className="ml-auto flex items-center gap-3 shrink-0">
+                  {filteredSummary.income > 0 && (
+                    <span className="text-xs tabular-nums text-emerald-700">+ {fmt(filteredSummary.income)}</span>
+                  )}
+                  {filteredSummary.expense > 0 && (
+                    <span className="text-xs tabular-nums text-red-600">− {fmt(filteredSummary.expense)}</span>
+                  )}
+                  {filteredSummary.income > 0 && filteredSummary.expense > 0 && (
+                    <span className={`text-xs tabular-nums font-medium ${filteredSummary.net >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                      = {filteredSummary.net >= 0 ? '+' : '−'} {fmt(Math.abs(filteredSummary.net))}
+                    </span>
+                  )}
+                </span>
               </div>
             )}
 
