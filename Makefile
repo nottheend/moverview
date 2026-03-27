@@ -32,6 +32,10 @@ VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null ||
 CLOUDRON_APP      ?= firefly-ui
 CLOUDRON_HOST     ?= your-cloudron.example.com
 
+NTFY_URL          ?=
+NTFY_TOPIC        ?= moverview-releases
+NTFY_TOKEN        ?=
+
 # ── Dev ───────────────────────────────────────────────────────────────────────
 
 .PHONY: dev
@@ -90,6 +94,24 @@ update: ## Update existing Cloudron app to latest image
 	cloudron update \
 	  --image $(IMAGE):$(VERSION) \
 	  --app $(CLOUDRON_APP)
+	@$(MAKE) notify
+
+.PHONY: notify
+notify: ## Send release notification via ntfy (runs automatically after update)
+	@if [ -z "$(NTFY_URL)" ] || [ -z "$(NTFY_TOKEN)" ]; then \
+	  echo "  ntfy not configured - skipping (set NTFY_URL and NTFY_TOKEN in .env)"; \
+	else \
+	  echo "  Sending release notification to $(NTFY_URL)/$(NTFY_TOPIC)"; \
+	  curl -s --fail \
+	    -H "Authorization: Bearer $(NTFY_TOKEN)" \
+	    -H "Title: MOverview $(VERSION) released" \
+	    -H "Tags: tada" \
+	    -H "Priority: default" \
+	    -d "Version $(VERSION) has been deployed and is live." \
+	    $(NTFY_URL)/$(NTFY_TOPIC) > /dev/null \
+	  && echo "  Notification sent" \
+	  || echo "  Notification failed - check NTFY_URL, NTFY_TOPIC and NTFY_TOKEN"; \
+	fi
 
 .PHONY: logs
 logs: ## Tail logs from the running Cloudron app
