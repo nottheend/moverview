@@ -236,27 +236,27 @@ function DateGroup({ date, transactions, onFilterCategory, onFilterBudget, onFil
 
 // ── Account row ───────────────────────────────────────────────────────────────
 
-function AccountRow({ account, mobile }) {
+function AccountRow({ account, mobile, isActive, onClick }) {
   const attr    = account.attributes;
   const balance = parseFloat(attr.current_balance);
 
   if (mobile) {
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">
+      <button onClick={onClick} className={`w-full flex items-center justify-between px-4 py-3 border-b border-stone-100 text-left hover:bg-stone-50 transition-colors ${isActive ? 'bg-stone-50' : ''}`}>
         <div>
-          <p className="text-sm text-stone-800 font-medium">{attr.name}</p>
+          <p className={`text-sm font-medium ${isActive ? 'font-semibold text-stone-800' : 'text-stone-800'}`}>{attr.name}</p>
           <p className="text-xs text-stone-400 mt-0.5">{attr.account_number || attr.type}</p>
         </div>
         <span className={`text-sm font-semibold tabular-nums ${balance >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
           {fmt(attr.current_balance, attr.currency_symbol)}
         </span>
-      </div>
+      </button>
     );
   }
 
   return (
-    <tr className="border-b border-stone-100 hover:bg-stone-50">
-      <td className="py-2.5 pl-4 pr-4 text-sm text-stone-800 font-medium">{attr.name}</td>
+    <tr onClick={onClick} className={`border-b border-stone-100 hover:bg-stone-50 cursor-pointer transition-colors ${isActive ? 'bg-stone-50' : ''}`}>
+      <td className={`py-2.5 pl-4 pr-4 text-sm ${isActive ? 'font-semibold text-stone-800' : 'text-stone-800 font-medium'}`}>{attr.name}</td>
       <td className="py-2.5 pr-4 text-xs text-stone-400 uppercase tracking-wide">{attr.type}</td>
       <td className="py-2.5 pr-4 text-sm text-stone-400 font-mono">{attr.account_number || '—'}</td>
       <td className={`py-2.5 pr-4 text-sm font-semibold text-right tabular-nums
@@ -655,7 +655,7 @@ export default function DashboardPage({ user, onLogout }) {
                   <FilterPill key={t} label={t} onClear={() => { setFilterTypes(prev => { const n = new Set(prev); n.delete(t); return n; }); setPage(1); }} />
                 ))}
                 {filterTag         && <FilterPill label={filterTag}         onClear={() => applyFilter(setFilterTag, null)} />}
-                {filterDestination && <FilterPill label={`→ ${filterDestination}`} onClear={() => applyFilter(setFilterDestination, null)} />}
+                {filterDestination && <FilterPill label={`Account: ${filterDestination}`} onClear={() => applyFilter(setFilterDestination, null)} />}
                 <button onClick={clearAll} className="text-xs text-stone-400 hover:text-stone-700 underline">
                   Clear all
                 </button>
@@ -747,7 +747,14 @@ export default function DashboardPage({ user, onLogout }) {
               {accountsOpen && (
                 <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
                   {mobile ? (
-                    accounts.map(a => <AccountRow key={a.id} account={a} mobile={true} />)
+                    accounts.map(a => (
+                      <AccountRow key={a.id} account={a} mobile={true}
+                        isActive={filterDestination === a.attributes?.name}
+                        onClick={() => applyFilter(setFilterDestination,
+                          filterDestination === a.attributes?.name ? null : a.attributes?.name
+                        )}
+                      />
+                    ))
                   ) : (
                     <table className="w-full">
                       <thead>
@@ -760,7 +767,14 @@ export default function DashboardPage({ user, onLogout }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {accounts.map(a => <AccountRow key={a.id} account={a} mobile={false} />)}
+                        {accounts.map(a => (
+                          <AccountRow key={a.id} account={a} mobile={false}
+                            isActive={filterDestination === a.attributes?.name}
+                            onClick={() => applyFilter(setFilterDestination,
+                              filterDestination === a.attributes?.name ? null : a.attributes?.name
+                            )}
+                          />
+                        ))}
                       </tbody>
                     </table>
                   )}
