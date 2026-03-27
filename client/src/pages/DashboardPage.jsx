@@ -409,13 +409,12 @@ export default function DashboardPage({ user, onLogout }) {
   const filtered = useMemo(() => transactions.filter(tx => {
     const split = tx.attributes?.transactions?.[0] || {};
     const type  = txType(split);
-    const dest  = type === 'transfer' || type === 'expense' ? split.destination_name : split.source_name;
     if (filterTypes.size  && !filterTypes.has(type))                               return false;
     if (filterCategory    && split.category_name !== filterCategory)               return false;
     if (filterBudget      && split.budget_name   !== filterBudget)                 return false;
     if (filterBill        && split.bill_name     !== filterBill)                   return false;
     if (filterTag         && !(split.tags || []).includes(filterTag))              return false;
-    if (filterDestination && dest                !== filterDestination)            return false;
+    if (filterDestination && split.source_name !== filterDestination && split.destination_name !== filterDestination) return false;
     return true;
   }), [transactions, filterTypes, filterCategory, filterBudget, filterBill, filterTag, filterDestination]);
 
