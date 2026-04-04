@@ -35,6 +35,12 @@ export const firefly = {
     return res.data || [];
   },
 
+  // Fetch all piggy banks
+  piggyBanks: async () => {
+    const res = await request('/api/firefly/piggy-banks?limit=50');
+    return res.data || [];
+  },
+
   // Fetch budgets list + per-budget limits once with a wide window.
   // Returns { budgets, periods } so callers can share the single pass.
   // budgets : array enriched with .spent for the given [startStr, endStr]

@@ -267,6 +267,44 @@ function AccountRow({ account, mobile, isActive, onClick }) {
   );
 }
 
+// ── Piggy bank row ────────────────────────────────────────────────────────────
+
+function PiggyBankRow({ bank }) {
+  const attr = bank.attributes || {};
+  const current = parseFloat(attr.current_amount || 0);
+  const target  = parseFloat(attr.target_amount  || 0);
+  const symbol  = attr.currency_symbol || '€';
+  const pct     = target > 0 ? Math.min(100, Math.round(current / target * 100)) : null;
+  const done    = target > 0 && current >= target;
+
+  const barColor = done ? '#1D9E75' : pct !== null && pct < 30 ? '#BA7517' : '#378ADD';
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 border-b border-stone-100 last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-stone-800 truncate">{attr.name}</p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+            <div
+              className="h-1.5 rounded-full transition-all"
+              style={{ width: `${pct ?? 0}%`, background: barColor }}
+            />
+          </div>
+          {pct !== null && (
+            <span className="text-xs text-stone-400 tabular-nums shrink-0 w-8 text-right">{pct}%</span>
+          )}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-semibold tabular-nums text-stone-700">{fmt(current, symbol)}</p>
+        {target > 0 && (
+          <p className="text-xs text-stone-400 mt-0.5">of {fmt(target, symbol)}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Budget × Category pie chart (pure SVG, no external deps) ─────────────────
 
 const CAT_COLORS = [
@@ -416,6 +454,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [accounts,      setAccounts]      = useState([]);
   const [budgets,       setBudgets]       = useState([]);
   const [bills,         setBills]         = useState([]);
+  const [piggyBanks,    setPiggyBanks]    = useState([]);
   const [transactions,  setTransactions]  = useState([]);
   const [budgetPeriods, setBudgetPeriods] = useState([]);
   const [loadingTx,       setLoadingTx]       = useState(true);
@@ -423,7 +462,10 @@ export default function DashboardPage({ user, onLogout }) {
   const [loadingBudgets,  setLoadingBudgets]  = useState(true);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loadingBills,    setLoadingBills]    = useState(true);
+  const [loadingPiggies,  setLoadingPiggies]  = useState(true);
   const [error,         setError]         = useState('');
+  const bottomRef = useRef(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const loading = loadingTx;
 
@@ -449,6 +491,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [categoriesOpen,   setCategoriesOpen]   = useState(false);
   const [billsOpen,        setBillsOpen]        = useState(false);
   const [tagsOpen,         setTagsOpen]         = useState(false);
+  const [piggyBanksOpen,   setPiggyBanksOpen]   = useState(false);
 
   // Detect mobile (< 768px) — re-checked on resize
   const [mobile, setMobile] = useState(() => window.innerWidth < 768);
@@ -457,6 +500,18 @@ export default function DashboardPage({ user, onLogout }) {
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  // Show scroll-to-bottom button when transactions section is in view
+  useEffect(() => {
+    const txSection = document.getElementById('transactions-section');
+    if (!txSection) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowScrollBtn(entry.isIntersecting),
+      { threshold: 0.1 }
+    );
+    observer.observe(txSection);
+    return () => observer.disconnect();
+  }, [loadingTx]);
 
   // On mount: immediately set current month so transactions load right away.
   // Budget spent amounts load in the background via the date-range effect.
@@ -481,6 +536,7 @@ export default function DashboardPage({ user, onLogout }) {
     setLoadingBudgets(true);
     setLoadingAccounts(true);
     setLoadingBills(true);
+    setLoadingPiggies(true);
 
     // 1. Transactions first — show immediately when ready
     firefly.transactions(start, end)
@@ -523,6 +579,12 @@ export default function DashboardPage({ user, onLogout }) {
       .then(setBills)
       .catch(() => {})
       .finally(() => { setLoadingBills(false); setLoadingMeta(false); });
+
+    // 5. Piggy banks — background, no date dependency
+    firefly.piggyBanks()
+      .then(setPiggyBanks)
+      .catch(() => {})
+      .finally(() => setLoadingPiggies(false));
 
   }, [activeDateRange]);
 
@@ -818,7 +880,7 @@ export default function DashboardPage({ user, onLogout }) {
             )}
 
             {/* ── Transactions ── */}
-            <section>
+            <section id="transactions-section">
               <div className="flex items-center justify-between mb-2 px-4 sm:px-0">
                 <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">
                   Transactions
@@ -1003,9 +1065,68 @@ export default function DashboardPage({ user, onLogout }) {
                 )}
               </section>
             )}
+
+            {/* ── Piggy banks ── */}
+            <section>
+              <button onClick={() => setPiggyBanksOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 sm:px-0 mb-2 group">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
+                    Piggy banks
+                  </h2>
+                  {loadingPiggies && <SectionSpinner />}
+                </div>
+                <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
+                  {piggyBanksOpen ? '▲' : '▼'}
+                </span>
+              </button>
+              {piggyBanksOpen && (
+                <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+                  {piggyBanks.map(b => <PiggyBankRow key={b.id} bank={b} />)}
+                  {piggyBanks.length === 0 && !loadingPiggies && (
+                    <p className="py-8 text-center text-stone-300 text-sm">No piggy banks found.</p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* bottom anchor */}
+            <div ref={bottomRef} />
           </>
         )}
       </main>
+
+      {/* ── Scroll-to-bottom button ── */}
+      {showScrollBtn && !loading && (
+        <button
+          onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          aria-label="Scroll to bottom"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 20,
+            zIndex: 50,
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            background: '#292524',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            opacity: 0.85,
+            fontSize: 18,
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '0.85'}
+        >
+          ↓
+        </button>
+      )}
     </div>
   );
 }
