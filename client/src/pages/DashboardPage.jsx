@@ -267,6 +267,149 @@ function AccountRow({ account, mobile, isActive, onClick }) {
   );
 }
 
+// ── Budget × Category pie chart (pure SVG, no external deps) ─────────────────
+
+const CAT_COLORS = [
+  '#378ADD', '#1D9E75', '#BA7517', '#D85A30',
+  '#7F77DD', '#888780', '#D4537E', '#639922',
+];
+
+// Compute SVG arc path for a pie slice given start/end angles (radians)
+function pieSlicePath(cx, cy, r, startAngle, endAngle) {
+  const x1 = cx + r * Math.cos(startAngle);
+  const y1 = cy + r * Math.sin(startAngle);
+  const x2 = cx + r * Math.cos(endAngle);
+  const y2 = cy + r * Math.sin(endAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+}
+
+function BudgetCategoryChart({ transactions, budgets, filterBudget, onSelectBudget, onSelectCategory }) {
+  const [chartBudget, setChartBudget] = useState(filterBudget || null);
+  const [hovered, setHovered] = useState(null);
+
+  // Sync selector when external filterBudget changes
+  useEffect(() => {
+    if (filterBudget) setChartBudget(filterBudget);
+  }, [filterBudget]);
+
+  const { slices, total, budgetSpent } = useMemo(() => {
+    const map = {};
+    transactions.forEach(tx => {
+      const split = tx.attributes?.transactions?.[0] || {};
+      if (split.type !== 'withdrawal') return;
+      if (chartBudget && split.budget_name !== chartBudget) return;
+      const cat = split.category_name || 'Uncategorized';
+      map[cat] = (map[cat] || 0) + parseFloat(split.amount || 0);
+    });
+    const entries = Object.entries(map).sort(([, a], [, b]) => b - a);
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+    const bObj = budgets.find(b => (b.attributes?.name || '') === chartBudget);
+    const budgetSpent = bObj?.spent ?? null;
+    return { slices: entries, total, budgetSpent };
+  }, [transactions, budgets, chartBudget]);
+
+  // Build pie slice paths
+  const cx = 90, cy = 90, r = 82;
+  let cursor = -Math.PI / 2; // start at top
+  const paths = slices.map(([cat, val], i) => {
+    const angle = total > 0 ? (val / total) * 2 * Math.PI : 0;
+    const startAngle = cursor;
+    const endAngle = cursor + angle;
+    cursor = endAngle;
+    return { cat, val, color: CAT_COLORS[i % CAT_COLORS.length], startAngle, endAngle, i };
+  });
+
+  return (
+    <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+      {/* Budget selector */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-stone-100">
+        <span className="text-xs text-stone-400 uppercase tracking-wide shrink-0">Budget</span>
+        <select
+          value={chartBudget || ''}
+          onChange={e => {
+            const v = e.target.value || null;
+            setChartBudget(v);
+            if (v) onSelectBudget(v);
+          }}
+          className="text-sm text-stone-700 bg-transparent border-0 outline-none cursor-pointer flex-1 min-w-0"
+        >
+          <option value="">All budgets</option>
+          {budgets.map(b => {
+            const name = b.attributes?.name || '—';
+            return <option key={b.id} value={name}>{name}</option>;
+          })}
+        </select>
+        {chartBudget && budgetSpent !== null && (
+          <span className="text-xs tabular-nums text-stone-400 shrink-0">
+            {fmt(budgetSpent)} spent
+          </span>
+        )}
+      </div>
+
+      {slices.length === 0 ? (
+        <p className="py-8 text-center text-stone-300 text-sm">No category data for this budget.</p>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-start">
+          {/* SVG pie */}
+          <div className="w-full sm:w-48 shrink-0 p-4 flex items-center justify-center">
+            <svg viewBox="0 0 180 180" width="180" height="180">
+              {paths.map(({ cat, val, color, startAngle, endAngle, i }) => (
+                <path
+                  key={cat}
+                  d={pieSlicePath(cx, cy, hovered === i ? r + 4 : r, startAngle, endAngle)}
+                  fill={color}
+                  stroke="#fff"
+                  strokeWidth="2"
+                  style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={() => onSelectCategory(cat)}
+                />
+              ))}
+              {/* Center label on hover */}
+              {hovered !== null && paths[hovered] && (
+                <>
+                  <text x={cx} y={cy - 8} textAnchor="middle" fontSize="11" fill="#78716c">
+                    {paths[hovered].cat}
+                  </text>
+                  <text x={cx} y={cy + 10} textAnchor="middle" fontSize="13" fontWeight="500" fill="#292524">
+                    {fmt(paths[hovered].val)}
+                  </text>
+                  <text x={cx} y={cy + 26} textAnchor="middle" fontSize="11" fill="#a8a29e">
+                    {total > 0 ? Math.round(paths[hovered].val / total * 100) : 0}%
+                  </text>
+                </>
+              )}
+            </svg>
+          </div>
+
+          {/* Legend / category list */}
+          <div className="flex-1 w-full divide-y divide-stone-100">
+            {slices.map(([cat, spent], i) => {
+              const pct = total > 0 ? Math.round(spent / total * 100) : 0;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => onSelectCategory(cat)}
+                  onMouseEnter={() => setHovered(i)}
+                  onMouseLeave={() => setHovered(null)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-stone-50 transition-colors text-left ${hovered === i ? 'bg-stone-50' : ''}`}
+                >
+                  <span style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0, background: CAT_COLORS[i % CAT_COLORS.length] }} />
+                  <span className="text-sm text-stone-600 flex-1 truncate">{cat}</span>
+                  <span className="text-xs text-stone-400 tabular-nums shrink-0 w-8 text-right">{pct}%</span>
+                  <span className="text-sm tabular-nums text-red-600 shrink-0 w-20 text-right">− {fmt(spent)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout }) {
@@ -796,17 +939,13 @@ export default function DashboardPage({ user, onLogout }) {
                 </span>
               </button>
               {categoriesOpen && (
-                <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
-                  {categorySummary.map(([cat, spent]) => (
-                    <button key={cat} onClick={() => applyFilter(setFilterCategory, filterCategory === cat ? null : cat)}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors
-                        ${filterCategory === cat ? 'bg-stone-50' : ''}`}>
-                      <span className={`text-sm ${filterCategory === cat ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{cat}</span>
-                      <span className="text-sm tabular-nums text-red-600">− {fmt(spent)}</span>
-                    </button>
-                  ))}
-                  {categorySummary.length === 0 && <p className="py-8 text-center text-stone-300 text-sm">No categories found.</p>}
-                </div>
+                <BudgetCategoryChart
+                  transactions={transactions}
+                  budgets={budgets}
+                  filterBudget={filterBudget}
+                  onSelectBudget={v => applyFilter(setFilterBudget, v)}
+                  onSelectCategory={cat => applyFilter(setFilterCategory, filterCategory === cat ? null : cat)}
+                />
               )}
             </section>
 
