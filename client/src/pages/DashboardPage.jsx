@@ -283,57 +283,169 @@ function AccountRow({ account, mobile, isActive, onClick }) {
 // ── Piggy bank row ────────────────────────────────────────────────────────────
 
 
-// ── Account balance chart ─────────────────────────────────────────────────────
 
-function AccountBalanceChart({ accounts, onFilterDestination, filterDestination }) {
-  if (!accounts.length) return null;
+// ── Account balance over time (line chart) ────────────────────────────────────
 
-  const symbol = accounts[0]?.attributes?.currency_symbol || '€';
-  const balances = accounts.map(a => ({
-    name: a.attributes.name,
-    balance: parseFloat(a.attributes.current_balance || 0),
-  }));
+const ACCOUNT_COLORS = [
+  '#0D9488', '#378ADD', '#BA7517', '#7F77DD',
+  '#D4537E', '#639922', '#D85A30', '#888780',
+];
 
-  const total = balances.reduce((s, a) => s + a.balance, 0);
-  const max   = Math.max(...balances.map(a => Math.abs(a.balance)));
+function AccountLineChart({ transactions }) {
+  // Build per-account balance-over-time from source_balance_after on each split
+  const { series, dateLabels } = useMemo(() => {
+    // Collect all splits, sorted by date ascending
+    const splits = [];
+    for (const tx of transactions) {
+      const sp = tx.attributes?.transactions?.[0] || {};
+      if (!sp.source_name || sp.source_balance_after == null) continue;
+      splits.push({
+        date: (sp.date || '').slice(0, 10),
+        account: sp.source_name,
+        balance: parseFloat(sp.source_balance_after),
+      });
+      // destination_balance_after for the receiving side
+      if (sp.destination_balance_after != null && sp.destination_name) {
+        splits.push({
+          date: (sp.date || '').slice(0, 10),
+          account: sp.destination_name,
+          balance: parseFloat(sp.destination_balance_after),
+        });
+      }
+    }
+    splits.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Unique sorted dates
+    const dateSet = [...new Set(splits.map(s => s.date))].sort();
+    if (dateSet.length < 2) return { series: [], dateLabels: [] };
+
+    // Per-account: last known balance on each date
+    const accountMap = {};
+    for (const { date, account, balance } of splits) {
+      if (!accountMap[account]) accountMap[account] = {};
+      accountMap[account][date] = balance;
+    }
+
+    // Forward-fill: for each account build a value per date
+    const accounts = Object.keys(accountMap);
+    const series = accounts.map((name, i) => {
+      let last = null;
+      const values = dateSet.map(d => {
+        if (accountMap[name][d] !== undefined) last = accountMap[name][d];
+        return last;
+      });
+      return { name, values, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length] };
+    });
+
+    // Only keep accounts that have asset-like data (skip expense/revenue accounts
+    // which appear as destinations — they tend to have always-increasing balances)
+    const filtered = series.filter(s => {
+      const vals = s.values.filter(v => v !== null);
+      if (vals.length < 2) return false;
+      const range = Math.max(...vals) - Math.min(...vals);
+      return range > 0;
+    });
+
+    return { series: filtered, dateLabels: dateSet };
+  }, [transactions]);
+
+  if (series.length === 0) return null;
+
+  const W = 600, H = 110, PAD = { t: 8, r: 8, b: 22, l: 44 };
+  const innerW = W - PAD.l - PAD.r;
+  const innerH = H - PAD.t - PAD.b;
+
+  const allValues = series.flatMap(s => s.values.filter(v => v !== null));
+  const minV = Math.min(...allValues);
+  const maxV = Math.max(...allValues);
+  const range = maxV - minV || 1;
+
+  const xOf = i => PAD.l + (i / (dateLabels.length - 1)) * innerW;
+  const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH;
+
+  const fmtY = v => {
+    const abs = Math.abs(v);
+    if (abs >= 1000) return `${(v / 1000).toFixed(1)}k`;
+    return Math.round(v).toString();
+  };
+
+  // Y axis ticks
+  const yTicks = [minV, minV + range * 0.5, maxV];
+
+  // X axis: show ~4 labels
+  const step = Math.max(1, Math.floor((dateLabels.length - 1) / 3));
+  const xTickIdxs = [];
+  for (let i = 0; i < dateLabels.length; i += step) xTickIdxs.push(i);
+  if (xTickIdxs[xTickIdxs.length - 1] !== dateLabels.length - 1)
+    xTickIdxs.push(dateLabels.length - 1);
 
   return (
     <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden mb-4">
-      <div className="flex flex-col divide-y divide-stone-100">
-        {balances.map(({ name, balance }) => {
-          const isActive  = filterDestination === name;
-          const isNeg     = balance < 0;
-          const barWidth  = max > 0 ? Math.abs(balance) / max : 0;
-          const barColor  = isNeg ? '#e57373' : '#0D9488';
-          const pct       = total !== 0 ? (balance / Math.abs(total) * 100) : 0;
-
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: '100%', height: 'auto', display: 'block' }}
+        aria-label="Account balances over time"
+      >
+        {/* Y grid lines */}
+        {yTicks.map((v, i) => (
+          <line key={i}
+            x1={PAD.l} y1={yOf(v)} x2={PAD.l + innerW} y2={yOf(v)}
+            stroke="#e7e5e4" strokeWidth="0.5"
+          />
+        ))}
+        {/* Zero line */}
+        {minV < 0 && maxV > 0 && (
+          <line
+            x1={PAD.l} y1={yOf(0)} x2={PAD.l + innerW} y2={yOf(0)}
+            stroke="#a8a29e" strokeWidth="0.8" strokeDasharray="3 2"
+          />
+        )}
+        {/* Y axis labels */}
+        {yTicks.map((v, i) => (
+          <text key={i} x={PAD.l - 4} y={yOf(v) + 3.5}
+            textAnchor="end" fontSize="8" fill="#a8a29e"
+          >{fmtY(v)}</text>
+        ))}
+        {/* X axis labels */}
+        {xTickIdxs.map(i => (
+          <text key={i} x={xOf(i)} y={H - 4}
+            textAnchor="middle" fontSize="8" fill="#a8a29e"
+          >{dateLabels[i].slice(5).replace('-', '.')}</text>
+        ))}
+        {/* Lines */}
+        {series.map(({ name, values, color }) => {
+          const pts = values
+            .map((v, i) => v !== null ? `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}` : null)
+            .filter(Boolean);
+          if (pts.length < 2) return null;
           return (
-            <button
-              key={name}
-              onClick={() => onFilterDestination(isActive ? null : name)}
-              className={`w-full text-left px-4 py-2.5 transition-colors hover:bg-stone-50 ${isActive ? 'bg-stone-50' : ''}`}
-            >
-              <div className="flex items-center justify-between gap-3 mb-1.5">
-                <span className={`text-xs truncate ${isActive ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{name}</span>
-                <span className={`text-xs font-semibold tabular-nums shrink-0 ${isNeg ? 'text-red-500' : 'text-stone-700'}`}>
-                  {isNeg ? '−' : ''}{fmt(Math.abs(balance), symbol)}
-                </span>
-              </div>
-              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                <div
-                  className="h-1.5 rounded-full transition-all"
-                  style={{ width: `${barWidth * 100}%`, background: barColor, opacity: isActive ? 1 : 0.65 }}
-                />
-              </div>
-            </button>
+            <polyline key={name}
+              points={pts.join(' ')}
+              fill="none" stroke={color} strokeWidth="1.5"
+              strokeLinejoin="round" strokeLinecap="round"
+            />
           );
         })}
-      </div>
-      <div className="flex items-center justify-between px-4 py-2 border-t border-stone-100 bg-stone-50">
-        <span className="text-xs text-stone-400 uppercase tracking-wide">Total</span>
-        <span className={`text-xs font-semibold tabular-nums ${total >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-          {total >= 0 ? '' : '−'}{fmt(Math.abs(total), symbol)}
-        </span>
+        {/* End-of-line dots + labels */}
+        {series.map(({ name, values, color }) => {
+          const lastIdx = values.length - 1;
+          const v = values[lastIdx];
+          if (v === null) return null;
+          return (
+            <circle key={name} cx={xOf(lastIdx)} cy={yOf(v)} r="2.5"
+              fill={color} stroke="white" strokeWidth="1"
+            />
+          );
+        })}
+      </svg>
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 pt-1">
+        {series.map(({ name, color }) => (
+          <span key={name} className="inline-flex items-center gap-1.5 text-xs text-stone-500">
+            <span style={{ width: 10, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
+            {name}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -945,12 +1057,8 @@ export default function DashboardPage({ user, onLogout }) {
                     })}
                   </div>
                 )}
-                {accounts.length > 0 && (
-                  <AccountBalanceChart
-                    accounts={accounts}
-                    filterDestination={filterDestination}
-                    onFilterDestination={v => applyFilter(setFilterDestination, v)}
-                  />
+                {transactions.length > 0 && (
+                  <AccountLineChart transactions={transactions} />
                 )}
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
