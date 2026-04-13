@@ -25,8 +25,33 @@ export const firefly = {
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
   transactions: async (startStr, endStr) => {
-    const res = await request(`/api/firefly/transactions?page=1&limit=500&type=default&start=${startStr}&end=${endStr}`);
-    return res.data || [];
+    const res = await request(`/api/firefly/transactions?page=1&limit=500&type=all&start=${startStr}&end=${endStr}`);
+    const raw = res.data || [];
+    // Flatten split transactions: each split becomes its own row with a stable
+    // synthetic id so deduplication and React keys work correctly.
+    const flat = [];
+    for (const tx of raw) {
+      const splits = tx.attributes?.transactions || [];
+      if (splits.length <= 1) {
+        flat.push(tx);
+      } else {
+        const groupTitle = tx.attributes?.group_title || splits[0]?.description || '';
+        for (let i = 0; i < splits.length; i++) {
+          flat.push({
+            ...tx,
+            id: `${tx.id}-s${i}`,
+            _splitIndex: i,
+            _groupTitle: groupTitle,
+            _isSplit: true,
+            attributes: {
+              ...tx.attributes,
+              transactions: [splits[i]],
+            },
+          });
+        }
+      }
+    }
+    return flat;
   },
 
   // Fetch all bills

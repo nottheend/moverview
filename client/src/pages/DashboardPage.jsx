@@ -177,6 +177,9 @@ function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterBill, o
   const isExpense  = type === 'expense';
   const isTransfer = type === 'transfer';
   const tags       = split.tags || [];
+  const reconciled = split.reconciled === true;
+  const isSplit    = tx._isSplit === true;
+  const groupTitle = tx._groupTitle;
 
   const source      = split.source_name;
   const destination = split.destination_name;
@@ -186,11 +189,21 @@ function TransactionCard({ tx, onFilterCategory, onFilterBudget, onFilterBill, o
   const typeLabel   = isExpense ? 'Expense' : isTransfer ? 'Transfer' : 'Income';
   const dateLabel   = split.date ? fmtDateShort(split.date) : null;
 
+  const description = split.description || '—';
+  // For splits, show the group title as context above if it differs from the split description
+  const showGroupTitle = isSplit && groupTitle && groupTitle !== description;
+
   return (
-    <div className="border-b border-stone-100 px-4 py-3 hover:bg-stone-50 transition-colors">
+    <div className={`border-b border-stone-100 px-4 py-3 hover:bg-stone-50 transition-colors${isSplit ? ' border-l-2 border-l-stone-200' : ''}`}>
+      {showGroupTitle && (
+        <p className="text-xs text-stone-400 mb-0.5 truncate">{groupTitle}</p>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-baseline gap-2 flex-1 min-w-0 pt-0.5">
-          <p className="text-sm text-stone-800 font-medium leading-snug">{split.description || '—'}</p>
+          <p className="text-sm text-stone-800 font-medium leading-snug">{description}</p>
+          {reconciled && (
+            <span title="Reconciled" className="shrink-0 inline-flex items-center justify-center text-emerald-600" style={{fontSize:13, lineHeight:1}}>✓</span>
+          )}
           {dateLabel && <span className="text-xs text-stone-400 whitespace-nowrap shrink-0">{dateLabel}</span>}
         </div>
         <div className="text-right shrink-0">
