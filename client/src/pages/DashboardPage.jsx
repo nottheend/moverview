@@ -282,6 +282,63 @@ function AccountRow({ account, mobile, isActive, onClick }) {
 
 // ── Piggy bank row ────────────────────────────────────────────────────────────
 
+
+// ── Account balance chart ─────────────────────────────────────────────────────
+
+function AccountBalanceChart({ accounts, onFilterDestination, filterDestination }) {
+  if (!accounts.length) return null;
+
+  const symbol = accounts[0]?.attributes?.currency_symbol || '€';
+  const balances = accounts.map(a => ({
+    name: a.attributes.name,
+    balance: parseFloat(a.attributes.current_balance || 0),
+  }));
+
+  const total = balances.reduce((s, a) => s + a.balance, 0);
+  const max   = Math.max(...balances.map(a => Math.abs(a.balance)));
+
+  return (
+    <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden mb-4">
+      <div className="flex flex-col divide-y divide-stone-100">
+        {balances.map(({ name, balance }) => {
+          const isActive  = filterDestination === name;
+          const isNeg     = balance < 0;
+          const barWidth  = max > 0 ? Math.abs(balance) / max : 0;
+          const barColor  = isNeg ? '#e57373' : '#0D9488';
+          const pct       = total !== 0 ? (balance / Math.abs(total) * 100) : 0;
+
+          return (
+            <button
+              key={name}
+              onClick={() => onFilterDestination(isActive ? null : name)}
+              className={`w-full text-left px-4 py-2.5 transition-colors hover:bg-stone-50 ${isActive ? 'bg-stone-50' : ''}`}
+            >
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <span className={`text-xs truncate ${isActive ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{name}</span>
+                <span className={`text-xs font-semibold tabular-nums shrink-0 ${isNeg ? 'text-red-500' : 'text-stone-700'}`}>
+                  {isNeg ? '−' : ''}{fmt(Math.abs(balance), symbol)}
+                </span>
+              </div>
+              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                <div
+                  className="h-1.5 rounded-full transition-all"
+                  style={{ width: `${barWidth * 100}%`, background: barColor, opacity: isActive ? 1 : 0.65 }}
+                />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between px-4 py-2 border-t border-stone-100 bg-stone-50">
+        <span className="text-xs text-stone-400 uppercase tracking-wide">Total</span>
+        <span className={`text-xs font-semibold tabular-nums ${total >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          {total >= 0 ? '' : '−'}{fmt(Math.abs(total), symbol)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 const HPF_NAME = 'Home Purchase Fund';
 const HPF_COLOR = '#0D9488';
 const HPF_COLOR_LIGHT = '#CCFBF1';
@@ -887,6 +944,13 @@ export default function DashboardPage({ user, onLogout }) {
                       );
                     })}
                   </div>
+                )}
+                {accounts.length > 0 && (
+                  <AccountBalanceChart
+                    accounts={accounts}
+                    filterDestination={filterDestination}
+                    onFilterDestination={v => applyFilter(setFilterDestination, v)}
+                  />
                 )}
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
