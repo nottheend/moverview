@@ -269,6 +269,32 @@ function AccountRow({ account, mobile, isActive, onClick }) {
 
 // ── Piggy bank row ────────────────────────────────────────────────────────────
 
+const HPF_NAME = 'Home Purchase Fund';
+const HPF_COLOR = '#0D9488';
+const HPF_COLOR_LIGHT = '#CCFBF1';
+const HPF_COLOR_MID = '#5EEAD4';
+const HPF_COLOR_DARK = '#0F766E';
+
+function HomePurchaseIcon() {
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+      {/* sky */}
+      <rect x="0" y="0" width="36" height="36" rx="8" fill={HPF_COLOR_LIGHT} />
+      {/* sea waves */}
+      <path d="M0 26 Q4 23 8 25 Q12 27 16 24 Q20 21 24 23 Q28 25 32 22 Q34 21 36 22 L36 36 L0 36 Z" fill={HPF_COLOR_MID} />
+      <path d="M0 29 Q5 27 9 28.5 Q14 30 18 28 Q23 26 27 27.5 Q31 29 36 27 L36 36 L0 36 Z" fill={HPF_COLOR} />
+      {/* house body */}
+      <rect x="11" y="18" width="14" height="10" rx="1" fill="white" opacity="0.9" />
+      {/* door */}
+      <rect x="15" y="22" width="4" height="6" rx="0.5" fill={HPF_COLOR_DARK} opacity="0.5" />
+      {/* window */}
+      <rect x="12.5" y="19.5" width="3" height="2.5" rx="0.5" fill={HPF_COLOR_MID} opacity="0.7" />
+      {/* roof */}
+      <path d="M9 18.5 L18 10 L27 18.5" fill={HPF_COLOR_DARK} />
+    </svg>
+  );
+}
+
 function PiggyBankRow({ bank }) {
   const attr = bank.attributes || {};
   const current = parseFloat(attr.current_amount || 0);
@@ -276,8 +302,40 @@ function PiggyBankRow({ bank }) {
   const symbol  = attr.currency_symbol || '€';
   const pct     = target > 0 ? Math.min(100, Math.round(current / target * 100)) : null;
   const done    = target > 0 && current >= target;
+  const isHPF   = attr.name === HPF_NAME;
 
-  const barColor = done ? '#1D9E75' : pct !== null && pct < 30 ? '#BA7517' : '#378ADD';
+  const barColor = isHPF
+    ? HPF_COLOR
+    : done ? '#1D9E75' : pct !== null && pct < 30 ? '#BA7517' : '#378ADD';
+
+  if (isHPF) {
+    return (
+      <div className="flex items-center gap-4 px-4 py-3 border-b border-stone-100 last:border-0"
+        style={{ background: '#F0FDFA' }}>
+        <HomePurchaseIcon />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: HPF_COLOR_DARK }}>{attr.name}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: HPF_COLOR_LIGHT }}>
+              <div
+                className="h-2 rounded-full transition-all"
+                style={{ width: `${pct ?? 0}%`, background: HPF_COLOR }}
+              />
+            </div>
+            {pct !== null && (
+              <span className="text-xs tabular-nums shrink-0 w-8 text-right font-medium" style={{ color: HPF_COLOR_DARK }}>{pct}%</span>
+            )}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-sm font-semibold tabular-nums" style={{ color: HPF_COLOR_DARK }}>{fmt(current, symbol)}</p>
+          {target > 0 && (
+            <p className="text-xs mt-0.5" style={{ color: HPF_COLOR }}>{`of ${fmt(target, symbol)}`}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 border-b border-stone-100 last:border-0">
@@ -1080,14 +1138,29 @@ export default function DashboardPage({ user, onLogout }) {
                   {piggyBanksOpen ? '▲' : '▼'}
                 </span>
               </button>
-              {piggyBanksOpen && (
-                <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
-                  {piggyBanks.map(b => <PiggyBankRow key={b.id} bank={b} />)}
-                  {piggyBanks.length === 0 && !loadingPiggies && (
-                    <p className="py-8 text-center text-stone-300 text-sm">No piggy banks found.</p>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const hpf = piggyBanks.find(b => b.attributes?.name === HPF_NAME);
+                const rest = piggyBanks.filter(b => b.attributes?.name !== HPF_NAME);
+                const sorted = hpf ? [hpf, ...rest] : rest;
+                if (piggyBanksOpen) {
+                  return (
+                    <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+                      {sorted.map(b => <PiggyBankRow key={b.id} bank={b} />)}
+                      {piggyBanks.length === 0 && !loadingPiggies && (
+                        <p className="py-8 text-center text-stone-300 text-sm">No piggy banks found.</p>
+                      )}
+                    </div>
+                  );
+                }
+                if (hpf) {
+                  return (
+                    <div className="rounded-none sm:rounded-lg border-y sm:border overflow-hidden" style={{ borderColor: HPF_COLOR_MID }}>
+                      <PiggyBankRow bank={hpf} />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </section>
 
             {/* bottom anchor */}
@@ -1106,8 +1179,8 @@ export default function DashboardPage({ user, onLogout }) {
             bottom: 24,
             right: 20,
             zIndex: 50,
-            width: 40,
-            height: 40,
+            width: 52,
+            height: 52,
             borderRadius: '50%',
             background: '#292524',
             color: '#fff',
@@ -1118,7 +1191,7 @@ export default function DashboardPage({ user, onLogout }) {
             justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
             opacity: 0.85,
-            fontSize: 18,
+            fontSize: 22,
             transition: 'opacity 0.2s',
           }}
           onMouseEnter={e => e.currentTarget.style.opacity = '1'}
