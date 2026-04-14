@@ -751,7 +751,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [filterBudget,     setFilterBudget]      = useState(null);
   const [filterBill,       setFilterBill]        = useState(null);
   const [filterTag,        setFilterTag]         = useState(null);
-  const [filterTypes,      setFilterTypes]       = useState(new Set()); // set of 'expense'|'income'|'transfer'
+  const [filterTypes,      setFilterTypes]       = useState(new Set(['expense', 'income'])); // set of 'expense'|'income'|'transfer'
   const [filterDestination,setFilterDestination] = useState(null);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
@@ -874,7 +874,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   function clearAll() {
     setFilterCategory(null); setFilterBudget(null); setFilterBill(null);
-    setFilterTag(null); setFilterTypes(new Set()); setFilterDestination(null);
+    setFilterTag(null); setFilterTypes(new Set(['expense', 'income'])); setFilterDestination(null);
     setPage(1);
   }
 
