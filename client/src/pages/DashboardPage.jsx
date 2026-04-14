@@ -958,8 +958,8 @@ export default function DashboardPage({ user, onLogout }) {
     <div className="min-h-screen bg-stone-50 text-stone-900">
 
       {/* Nav */}
-      <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="bg-white border-b border-stone-200 px-4 py-3 flex items-center sticky top-0 z-10" style={{position:'sticky'}}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <img src="/icon.svg" alt="MOverview" className="w-7 h-7 shrink-0" /><span className="text-stone-800 font-semibold tracking-tight shrink-0">MOverview</span>
           <span className="text-stone-300 shrink-0">·</span>
           <span className="text-sm text-stone-400 truncate">
@@ -976,10 +976,10 @@ export default function DashboardPage({ user, onLogout }) {
             }} />
           )}
         </div>
-        <span className="text-xs text-stone-300 shrink-0 hidden sm:inline">{__APP_VERSION__}</span>
-        <button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0 ml-2">
+        <span className="text-xs text-stone-300 hidden sm:inline" style={{position:'absolute',left:'50%',transform:'translateX(-50%)'}}>{__APP_VERSION__}</span>
+        <div className="flex items-center justify-end flex-1"><button onClick={onLogout} className="text-sm text-stone-400 hover:text-stone-700 transition-colors shrink-0">
           Sign out
-        </button>
+        </button></div>
       </header>
 
       <main className="mx-auto max-w-6xl px-0 sm:px-4 py-6 space-y-6">
