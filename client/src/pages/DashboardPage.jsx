@@ -292,61 +292,42 @@ const ACCOUNT_COLORS = [
 ];
 
 function AccountLineChart({ transactions, accounts }) {
-  // Build per-account balance-over-time from source_balance_after on each split
+  const [selected, setSelected] = useState(null);
+
   const { series, dateLabels } = useMemo(() => {
-    // Collect all splits, sorted by date ascending
     const splits = [];
     for (const tx of transactions) {
       const sp = tx.attributes?.transactions?.[0] || {};
       if (!sp.source_name || sp.source_balance_after == null) continue;
-      splits.push({
-        date: (sp.date || '').slice(0, 10),
-        account: sp.source_name,
-        balance: parseFloat(sp.source_balance_after),
-      });
-      // destination_balance_after for the receiving side
-      if (sp.destination_balance_after != null && sp.destination_name) {
-        splits.push({
-          date: (sp.date || '').slice(0, 10),
-          account: sp.destination_name,
-          balance: parseFloat(sp.destination_balance_after),
-        });
-      }
+      splits.push({ date: (sp.date || '').slice(0, 10), account: sp.source_name, balance: parseFloat(sp.source_balance_after) });
+      if (sp.destination_balance_after != null && sp.destination_name)
+        splits.push({ date: (sp.date || '').slice(0, 10), account: sp.destination_name, balance: parseFloat(sp.destination_balance_after) });
     }
     splits.sort((a, b) => a.date.localeCompare(b.date));
-
-    // Unique sorted dates
     const dateSet = [...new Set(splits.map(s => s.date))].sort();
     if (dateSet.length < 2) return { series: [], dateLabels: [] };
-
-    // Per-account: last known balance on each date
     const accountMap = {};
     for (const { date, account, balance } of splits) {
       if (!accountMap[account]) accountMap[account] = {};
       accountMap[account][date] = balance;
     }
-
-    // Forward-fill: for each account build a value per date
-    const accounts = Object.keys(accountMap);
-    const series = accounts.map((name, i) => {
-      let last = null;
-      const values = dateSet.map(d => {
-        if (accountMap[name][d] !== undefined) last = accountMap[name][d];
-        return last;
-      });
-      return { name, values, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length] };
-    });
-
-    // Only keep accounts that are in the asset accounts list (by name)
     const assetNames = new Set((accounts || []).map(a => a.attributes?.name).filter(Boolean));
-    const filtered = series.filter(s => assetNames.has(s.name));
-
-    return { series: filtered, dateLabels: dateSet };
-  }, [transactions]);
+    const series = Object.keys(accountMap)
+      .filter(name => assetNames.has(name))
+      .map((name, i) => {
+        let last = null;
+        const values = dateSet.map(d => {
+          if (accountMap[name][d] !== undefined) last = accountMap[name][d];
+          return last;
+        });
+        return { name, values, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length] };
+      });
+    return { series, dateLabels: dateSet };
+  }, [transactions, accounts]);
 
   if (series.length === 0) return null;
 
-  const W = 600, H = 110, PAD = { t: 8, r: 8, b: 22, l: 44 };
+  const W = 600, H = 120, PAD = { t: 8, r: 80, b: 22, l: 44 };
   const innerW = W - PAD.l - PAD.r;
   const innerH = H - PAD.t - PAD.b;
 
@@ -364,83 +345,123 @@ function AccountLineChart({ transactions, accounts }) {
     return Math.round(v).toString();
   };
 
-  // Y axis ticks
   const yTicks = [minV, minV + range * 0.5, maxV];
-
-  // X axis: show ~4 labels
   const step = Math.max(1, Math.floor((dateLabels.length - 1) / 3));
   const xTickIdxs = [];
   for (let i = 0; i < dateLabels.length; i += step) xTickIdxs.push(i);
-  if (xTickIdxs[xTickIdxs.length - 1] !== dateLabels.length - 1)
-    xTickIdxs.push(dateLabels.length - 1);
+  if (xTickIdxs[xTickIdxs.length - 1] !== dateLabels.length - 1) xTickIdxs.push(dateLabels.length - 1);
+
+  const toggle = name => setSelected(s => s === name ? null : name);
+  const hasSelection = selected !== null;
+
+  // For selected line: find min, max, last values to annotate
+  const selectedSeries = series.find(s => s.name === selected);
+  const symbol = accounts?.[0]?.attributes?.currency_symbol || '€';
 
   return (
     <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden mb-4">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block' }}
+        style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer' }}
         aria-label="Account balances over time"
       >
         {/* Y grid lines */}
         {yTicks.map((v, i) => (
-          <line key={i}
-            x1={PAD.l} y1={yOf(v)} x2={PAD.l + innerW} y2={yOf(v)}
-            stroke="#e7e5e4" strokeWidth="0.5"
-          />
+          <line key={i} x1={PAD.l} y1={yOf(v)} x2={PAD.l + innerW} y2={yOf(v)} stroke="#e7e5e4" strokeWidth="0.5" />
         ))}
         {/* Zero line */}
         {minV < 0 && maxV > 0 && (
-          <line
-            x1={PAD.l} y1={yOf(0)} x2={PAD.l + innerW} y2={yOf(0)}
-            stroke="#a8a29e" strokeWidth="0.8" strokeDasharray="3 2"
-          />
+          <line x1={PAD.l} y1={yOf(0)} x2={PAD.l + innerW} y2={yOf(0)} stroke="#a8a29e" strokeWidth="0.8" strokeDasharray="3 2" />
         )}
         {/* Y axis labels */}
         {yTicks.map((v, i) => (
-          <text key={i} x={PAD.l - 4} y={yOf(v) + 3.5}
-            textAnchor="end" fontSize="8" fill="#a8a29e"
-          >{fmtY(v)}</text>
+          <text key={i} x={PAD.l - 4} y={yOf(v) + 3.5} textAnchor="end" fontSize="8" fill="#a8a29e">{fmtY(v)}</text>
         ))}
         {/* X axis labels */}
         {xTickIdxs.map(i => (
-          <text key={i} x={xOf(i)} y={H - 4}
-            textAnchor="middle" fontSize="8" fill="#a8a29e"
-          >{dateLabels[i].slice(5).replace('-', '.')}</text>
+          <text key={i} x={xOf(i)} y={H - 4} textAnchor="middle" fontSize="8" fill="#a8a29e">{dateLabels[i].slice(5).replace('-', '.')}</text>
         ))}
-        {/* Lines */}
-        {series.map(({ name, values, color }) => {
-          const pts = values
-            .map((v, i) => v !== null ? `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}` : null)
-            .filter(Boolean);
+        {/* Lines — unselected drawn first (behind) */}
+        {series.filter(s => s.name !== selected).map(({ name, values, color }) => {
+          const pts = values.map((v, i) => v !== null ? `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}` : null).filter(Boolean);
           if (pts.length < 2) return null;
           return (
-            <polyline key={name}
-              points={pts.join(' ')}
-              fill="none" stroke={color} strokeWidth="1.5"
+            <polyline key={name} points={pts.join(' ')} fill="none"
+              stroke={color} strokeWidth={hasSelection ? 1 : 1.5}
+              opacity={hasSelection ? 0.18 : 1}
               strokeLinejoin="round" strokeLinecap="round"
+              style={{ cursor: 'pointer' }}
+              onClick={() => toggle(name)}
             />
           );
         })}
-        {/* End-of-line dots + labels */}
-        {series.map(({ name, values, color }) => {
+        {/* Selected line drawn on top */}
+        {selectedSeries && (() => {
+          const { name, values, color } = selectedSeries;
+          const pts = values.map((v, i) => v !== null ? `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}` : null).filter(Boolean);
+          if (pts.length < 2) return null;
+          const lastIdx = values.length - 1;
+          const lastV = values[lastIdx];
+          const nonNull = values.filter(v => v !== null);
+          const peakV = Math.max(...nonNull);
+          const troughV = Math.min(...nonNull);
+          const peakIdx = values.lastIndexOf(peakV);
+          const troughIdx = values.lastIndexOf(troughV);
+          return (
+            <g key={name} onClick={() => toggle(name)} style={{ cursor: 'pointer' }}>
+              <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="2.2"
+                strokeLinejoin="round" strokeLinecap="round" />
+              {/* last balance label */}
+              {lastV !== null && (
+                <>
+                  <circle cx={xOf(lastIdx)} cy={yOf(lastV)} r="3" fill={color} stroke="white" strokeWidth="1.5" />
+                  <text x={xOf(lastIdx) + 6} y={yOf(lastV) + 3.5} fontSize="8.5" fill={color} fontWeight="500">{fmtY(lastV)}</text>
+                </>
+              )}
+              {/* peak label (only if meaningfully different from last) */}
+              {peakIdx !== lastIdx && Math.abs(peakV - lastV) / (range || 1) > 0.08 && (
+                <>
+                  <circle cx={xOf(peakIdx)} cy={yOf(peakV)} r="2" fill={color} stroke="white" strokeWidth="1" />
+                  <text x={xOf(peakIdx)} y={yOf(peakV) - 4} fontSize="8" fill={color} textAnchor="middle" opacity="0.8">{fmtY(peakV)}</text>
+                </>
+              )}
+              {/* trough label (only if negative or meaningfully different) */}
+              {troughIdx !== lastIdx && troughIdx !== peakIdx && Math.abs(troughV - lastV) / (range || 1) > 0.08 && (
+                <>
+                  <circle cx={xOf(troughIdx)} cy={yOf(troughV)} r="2" fill={color} stroke="white" strokeWidth="1" />
+                  <text x={xOf(troughIdx)} y={yOf(troughV) + 11} fontSize="8" fill={color} textAnchor="middle" opacity="0.8">{fmtY(troughV)}</text>
+                </>
+              )}
+            </g>
+          );
+        })()}
+        {/* Unselected end dots */}
+        {!hasSelection && series.map(({ name, values, color }) => {
           const lastIdx = values.length - 1;
           const v = values[lastIdx];
           if (v === null) return null;
-          return (
-            <circle key={name} cx={xOf(lastIdx)} cy={yOf(v)} r="2.5"
-              fill={color} stroke="white" strokeWidth="1"
-            />
-          );
+          return <circle key={name} cx={xOf(lastIdx)} cy={yOf(v)} r="2.5" fill={color} stroke="white" strokeWidth="1" />;
         })}
       </svg>
-      {/* Legend */}
+      {/* Legend — clickable */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 pt-1">
-        {series.map(({ name, color }) => (
-          <span key={name} className="inline-flex items-center gap-1.5 text-xs text-stone-500">
-            <span style={{ width: 10, height: 2, background: color, display: 'inline-block', borderRadius: 1 }} />
-            {name}
-          </span>
-        ))}
+        {series.map(({ name, color }) => {
+          const isSel = selected === name;
+          const faded = hasSelection && !isSel;
+          return (
+            <button key={name} onClick={() => toggle(name)}
+              className="inline-flex items-center gap-1.5 text-xs transition-opacity"
+              style={{ opacity: faded ? 0.3 : 1, color: isSel ? color : '#78716c', fontWeight: isSel ? 500 : 400 }}>
+              <span style={{ width: isSel ? 14 : 10, height: isSel ? 2.5 : 2, background: color, display: 'inline-block', borderRadius: 1, transition: 'all 0.15s' }} />
+              {name}
+            </button>
+          );
+        })}
+        {hasSelection && (
+          <button onClick={() => setSelected(null)} className="text-xs text-stone-300 hover:text-stone-500 transition-colors ml-1">
+            clear
+          </button>
+        )}
       </div>
     </div>
   );
