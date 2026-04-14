@@ -759,6 +759,8 @@ export default function DashboardPage({ user, onLogout }) {
   const [billsOpen,        setBillsOpen]        = useState(false);
   const [tagsOpen,         setTagsOpen]         = useState(false);
   const [piggyBanksOpen,   setPiggyBanksOpen]   = useState(false);
+  const [visionOpen,       setVisionOpen]       = useState(false);
+  const [visionText,       setVisionText]       = useState(() => { try { return localStorage.getItem('moverview_vision') || ''; } catch { return ''; } });
 
   // Detect mobile (< 768px) — re-checked on resize
   const [mobile, setMobile] = useState(() => window.innerWidth < 768);
@@ -1087,9 +1089,24 @@ export default function DashboardPage({ user, onLogout }) {
                 {transactions.length > 0 && (
                   <AccountLineChart transactions={transactions} accounts={accounts} />
                 )}
-                <div className="flex items-center gap-2 mb-3">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
-                  {loadingBudgets && <SectionSpinner label="loading amounts…" />}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
+                    {loadingBudgets && <SectionSpinner label="loading amounts…" />}
+                  </div>
+                  <button
+                    onClick={() => setVisionOpen(o => !o)}
+                    className="inline-flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-600 transition-colors"
+                    style={{ fontSize: 11 }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <path d="M0 9 Q1.5 6.5 3 7.5 Q4.5 8.5 6.5 6 Q8.5 3.5 10 5.5 Q11.5 7.5 13 6 L13 13 L0 13Z" fill="#5DCAA5" opacity="0.6"/>
+                      <path d="M0 11 Q2 9 4 10 Q6.5 11 9 9.5 Q11 8.5 13 9.5 L13 13 L0 13Z" fill="#1D9E75" opacity="0.7"/>
+                      <circle cx="9.5" cy="3" r="2" fill="#9FE1CB" opacity="0.6"/>
+                      <circle cx="11" cy="1.5" r="1.2" fill="#9FE1CB" opacity="0.4"/>
+                    </svg>
+                    Future Vision
+                  </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {budgets.map(b => {
@@ -1373,6 +1390,72 @@ export default function DashboardPage({ user, onLogout }) {
                 }
                 return null;
               })()}
+            </section>
+
+            {/* ── Future Vision footer ── */}
+            <section className="px-4 sm:px-0">
+              {visionOpen ? (
+                <div className="rounded-lg overflow-hidden" style={{ border: '0.5px solid #9FE1CB' }}>
+                  <div className="flex items-center justify-between px-4 py-2.5" style={{ background: '#E1F5EE', borderBottom: '0.5px solid #9FE1CB' }}>
+                    <div className="flex items-center gap-2">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M0 9 Q2 6 4 7.5 Q6 9 7 6.5 Q9 4 11 6 Q12.5 7.5 14 6 L14 14 L0 14Z" fill="#5DCAA5" opacity="0.55"/>
+                        <path d="M0 11.5 Q3 9.5 5.5 10.5 Q8 11.5 10.5 10 Q12 9 14 10 L14 14 L0 14Z" fill="#1D9E75" opacity="0.65"/>
+                        <circle cx="10" cy="3.5" r="2" fill="#9FE1CB" opacity="0.6"/>
+                      </svg>
+                      <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#085041' }}>Future Vision</span>
+                    </div>
+                    <button
+                      onClick={() => setVisionOpen(false)}
+                      className="text-xs hover:text-stone-600 transition-colors"
+                      style={{ color: '#0F6E56', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: '#9FE1CB', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
+                    >×</button>
+                  </div>
+                  <div className="bg-white px-4 py-3 flex flex-col gap-3">
+                    <textarea
+                      value={visionText}
+                      onChange={e => setVisionText(e.target.value)}
+                      placeholder="In five years I want to…"
+                      className="w-full text-sm text-stone-700 border border-stone-200 rounded-md px-3 py-2.5 resize-none outline-none transition-colors"
+                      style={{ minHeight: 100, lineHeight: 1.6, fontFamily: 'inherit' }}
+                      onFocus={e => e.target.style.borderColor = '#5DCAA5'}
+                      onBlur={e => e.target.style.borderColor = ''}
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-stone-300">saved locally</span>
+                      <button
+                        onClick={() => { try { localStorage.setItem('moverview_vision', visionText); } catch {} }}
+                        className="text-xs text-white px-4 py-1.5 rounded transition-colors"
+                        style={{ background: '#1D9E75', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                      >Save</button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setVisionOpen(true)}
+                  className="w-full overflow-hidden rounded-lg transition-opacity hover:opacity-90"
+                  style={{ border: '0.5px solid #9FE1CB', padding: 0, background: 'none', cursor: 'pointer', display: 'block' }}
+                >
+                  <svg viewBox="0 0 600 80" style={{ width: '100%', height: 'auto', display: 'block' }} fill="none">
+                    <rect width="600" height="80" fill="#E1F5EE"/>
+                    <rect width="600" height="80" fill="#CCFBF1" opacity="0.35"/>
+                    <path d="M0 44 Q30 36 60 40 Q90 44 120 37 Q150 30 180 36 Q210 42 240 35 Q270 28 300 34 Q330 40 360 33 Q390 26 420 32 Q450 38 480 31 Q520 23 560 30 Q580 33 600 28 L600 80 L0 80Z" fill="#9FE1CB" opacity="0.45"/>
+                    <path d="M0 54 Q40 46 80 50 Q120 54 160 47 Q200 40 240 46 Q280 52 320 45 Q360 38 400 44 Q440 50 480 43 Q530 35 600 40 L600 80 L0 80Z" fill="#5DCAA5" opacity="0.5"/>
+                    <path d="M0 64 Q50 57 100 61 Q150 65 200 58 Q250 51 300 56 Q350 61 400 55 Q450 49 500 54 Q550 59 600 54 L600 80 L0 80Z" fill="#1D9E75" opacity="0.55"/>
+                    <path d="M0 72 Q60 67 120 70 Q180 73 240 68 Q300 63 360 67 Q420 71 480 66 Q540 61 600 65 L600 80 L0 80Z" fill="#0F6E56" opacity="0.4"/>
+                    <path d="M240 44 Q252 24 264 22 Q276 20 282 34 Q288 22 298 24 Q306 26 308 40" fill="#E1F5EE" opacity="0.6"/>
+                    <path d="M60 38 Q70 22 78 20 Q86 18 90 30 Q94 20 102 22 Q108 24 110 36" fill="#E1F5EE" opacity="0.45"/>
+                    <path d="M460 36 Q468 22 474 20 Q482 18 486 30 Q490 20 498 22 Q504 24 506 34" fill="#E1F5EE" opacity="0.4"/>
+                    <rect x="340" y="32" width="22" height="14" rx="1.5" fill="#085041" opacity="0.12"/>
+                    <rect x="345" y="36" width="4" height="3.5" rx="0.5" fill="#085041" opacity="0.18"/>
+                    <rect x="352" y="36" width="4" height="3.5" rx="0.5" fill="#085041" opacity="0.18"/>
+                    <rect x="347" y="39.5" width="7" height="7" rx="0.5" fill="#085041" opacity="0.15"/>
+                    <path d="M336 33 L351 22 L366 33" fill="#0F6E56" opacity="0.2"/>
+                    <text x="300" y="70" textAnchor="middle" fontSize="11" fill="#085041" fontFamily="sans-serif" opacity="0.8">Future Vision</text>
+                  </svg>
+                </button>
+              )}
             </section>
 
             {/* bottom anchor */}
