@@ -311,15 +311,26 @@ function AccountLineChart({ transactions, accounts }) {
       if (!accountMap[account]) accountMap[account] = {};
       accountMap[account][date] = balance;
     }
+    const EXCLUDED = new Set(['comdirect savings account', 'Leaseplan Bank', 'Scalable.capital']);
     const assetNames = new Set((accounts || []).map(a => a.attributes?.name).filter(Boolean));
     const series = Object.keys(accountMap)
-      .filter(name => assetNames.has(name))
+      .filter(name => assetNames.has(name) && !EXCLUDED.has(name))
       .map((name, i) => {
+        // Forward-fill
         let last = null;
         const values = dateSet.map(d => {
           if (accountMap[name][d] !== undefined) last = accountMap[name][d];
           return last;
         });
+        // Back-fill: propagate the earliest known value to the start
+        const firstKnown = values.find(v => v !== null);
+        if (firstKnown !== null && firstKnown !== undefined) {
+          let filling = true;
+          for (let i = 0; i < values.length; i++) {
+            if (filling && values[i] === null) values[i] = firstKnown;
+            else filling = false;
+          }
+        }
         return { name, values, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length] };
       });
     return { series, dateLabels: dateSet };
