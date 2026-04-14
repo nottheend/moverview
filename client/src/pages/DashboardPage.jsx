@@ -291,7 +291,7 @@ const ACCOUNT_COLORS = [
   '#D4537E', '#639922', '#D85A30', '#888780',
 ];
 
-function AccountLineChart({ transactions }) {
+function AccountLineChart({ transactions, accounts }) {
   // Build per-account balance-over-time from source_balance_after on each split
   const { series, dateLabels } = useMemo(() => {
     // Collect all splits, sorted by date ascending
@@ -337,14 +337,9 @@ function AccountLineChart({ transactions }) {
       return { name, values, color: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length] };
     });
 
-    // Only keep accounts that have asset-like data (skip expense/revenue accounts
-    // which appear as destinations — they tend to have always-increasing balances)
-    const filtered = series.filter(s => {
-      const vals = s.values.filter(v => v !== null);
-      if (vals.length < 2) return false;
-      const range = Math.max(...vals) - Math.min(...vals);
-      return range > 0;
-    });
+    // Only keep accounts that are in the asset accounts list (by name)
+    const assetNames = new Set((accounts || []).map(a => a.attributes?.name).filter(Boolean));
+    const filtered = series.filter(s => assetNames.has(s.name));
 
     return { series: filtered, dateLabels: dateSet };
   }, [transactions]);
@@ -1058,7 +1053,7 @@ export default function DashboardPage({ user, onLogout }) {
                   </div>
                 )}
                 {transactions.length > 0 && (
-                  <AccountLineChart transactions={transactions} />
+                  <AccountLineChart transactions={transactions} accounts={accounts} />
                 )}
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400">Budgets</h2>
