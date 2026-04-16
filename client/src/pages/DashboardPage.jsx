@@ -311,7 +311,7 @@ function AccountLineChart({ transactions, accounts }) {
       if (!accountMap[account]) accountMap[account] = {};
       accountMap[account][date] = balance;
     }
-    const EXCLUDED = new Set(['comdirect savings account', 'Leaseplan Bank', 'Scalable.capital']);
+    const EXCLUDED = new Set(['comdirect savings account', 'Leaseplan Bank', 'Scalable.capital', 'Paycheck']);
     const assetNames = new Set((accounts || []).map(a => a.attributes?.name).filter(Boolean));
     const series = Object.keys(accountMap)
       .filter(name => assetNames.has(name) && !EXCLUDED.has(name))
