@@ -107,15 +107,21 @@ The login session is saved to disk and survives the version switch.
 ### One-time: login to Docker registry + deploy
 
 ```bash
-# Fill in .env first:
+# Fill in .env first (registry + app location only — no Firefly vars):
 #   CLOUDRON_REGISTRY=registry.your-cloudron.example.com
 #   CLOUDRON_APP=moverview.yourdomain.com
-#   FIREFLY_BASE_URL=https://firefly.yourdomain.com
-#   FIREFLY_TOKEN=your-token
 
 make login     # login to your Cloudron Docker registry (once per machine)
 make release   # build + push image
-make deploy    # install on Cloudron
+make deploy    # install on Cloudron — prints env set instructions after
+```
+
+`make deploy` will print the exact `cloudron env set` command to run next.
+Run it, then restart the app:
+
+```bash
+cloudron env set --app <CLOUDRON_APP> FIREFLY_BASE_URL=https://firefly.yourdomain.com FIREFLY_TOKEN=your-token
+cloudron restart --app <CLOUDRON_APP>
 ```
 
 ### Subsequent deploys
@@ -181,3 +187,23 @@ Full API docs: https://api-docs.firefly-iii.org/
 
 The backend proxies `GET /api/firefly/*` → `FIREFLY_BASE_URL/api/v1/*`
 To add a new endpoint: add a method to `client/src/api.js` — that's it.
+
+---
+
+## Setting env vars
+
+`FIREFLY_BASE_URL` and `FIREFLY_TOKEN` live on the Cloudron app, not in `.env`.
+Set them with the CLI — both on first install and whenever you need to change them:
+
+```bash
+cloudron env set --app <CLOUDRON_APP> FIREFLY_BASE_URL=https://firefly.yourdomain.com FIREFLY_TOKEN=your-token
+cloudron restart --app <CLOUDRON_APP>
+```
+
+To check what is currently set:
+
+```bash
+cloudron env list --app <CLOUDRON_APP>
+```
+
+> **`.env` is for local dev and deploy tooling only.** Changes to it never affect the running app.

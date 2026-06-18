@@ -86,8 +86,13 @@ release: build push ## Build + push in one step (most common command)
 deploy: ## First-time install on Cloudron
 	cloudron install \
 	  --image $(IMAGE):$(VERSION) \
-	  --location $(CLOUDRON_APP) \
-	  --env FIREFLY_BASE_URL=$(FIREFLY_BASE_URL) FIREFLY_TOKEN=$(FIREFLY_TOKEN)
+	  --location $(CLOUDRON_APP)
+	@echo ""
+	@echo "  App installed. Now set the required env vars:"
+	@echo "    cloudron env set --app $(CLOUDRON_APP) FIREFLY_BASE_URL=https://... FIREFLY_TOKEN=..."
+	@echo "    cloudron restart --app $(CLOUDRON_APP)"
+	@echo "  To update them later, use the same cloudron env set command."
+	@echo "
 
 .PHONY: update
 update: ## Update existing Cloudron app to latest image
