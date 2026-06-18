@@ -14,5 +14,6 @@
   "website": "https://github.com/nottheend/moverview",
   "contactEmail": "info@nottheend.info",
   "icon": "file://icon.svg",
-  "tags": ["finance", "money"]
+  "tags": ["finance", "money"],
+  "changelog": "file://CHANGELOG"
 }

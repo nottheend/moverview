@@ -1,0 +1,7 @@
+[0.8.5]
+- Fix: proxy now detects when Firefly-III redirects to login (expired/invalid token)
+  and returns a clear HTTP 401 instead of a confusing JSON parse error
+- Fix: guard against non-JSON responses from misconfigured reverse proxies
+- Fix: error messages now include the Node.js error code (e.g. ECONNREFUSED),
+  the target URL, and the raw detail — making connection issues actionable
+- Chore: remove unused SESSION_SECRET from .env.example

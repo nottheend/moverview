@@ -56,7 +56,7 @@ install-deps: ## Install all npm dependencies
 .PHONY: manifest
 manifest: ## Inject current git tag into CloudronManifest.json
 	@echo "Generating CloudronManifest.json for version $(VERSION)"
-	@sed 's/VERSION_PLACEHOLDER/$(VERSION)/' CloudronManifest.json.template > CloudronManifest.json
+	@sed 's/VERSION_PLACEHOLDER/$(VERSION:v%=%)/g' CloudronManifest.json.template > CloudronManifest.json
 	@echo "  → CloudronManifest.json updated"
 
 # ── Docker ────────────────────────────────────────────────────────────────────
