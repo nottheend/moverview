@@ -70,7 +70,12 @@ app.get('/api/firefly/*', async (req, res) => {
     res.status(response.status).json(data);
   } catch (err) {
     console.error('[proxy] Firefly request failed:', err.message);
-    res.status(502).json({ error: 'Failed to reach Firefly-III', detail: err.message });
+    res.status(502).json({
+      error: 'Failed to reach Firefly-III',
+      detail: err.message,
+      target: targetUrl,
+      code: err.code || null,
+    });
   }
 });
 
