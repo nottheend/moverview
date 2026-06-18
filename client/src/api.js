@@ -7,15 +7,8 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    const parts = [err.error || res.statusText];
-    if (err.detail) parts.push(err.detail);
-    if (err.code) parts.push(`(${err.code})`);
-    if (err.target) parts.push(`\u2192 ${err.target}`);
-    const e = new Error(parts.join(' \u2013 '));
+    const e = new Error(err.error || res.statusText);
     e.status = res.status;
-    e.detail = err.detail || null;
-    e.code = err.code || null;
-    e.target = err.target || null;
     throw e;
   }
 
@@ -82,13 +75,13 @@ export const firefly = {
   // onBudgetResolved(budget) — called per-budget as each limits call finishes
   // Returns a promise that resolves with { periods } when all limits are done.
   budgetsAndPeriods: async (startStr, endStr, { onBudgetsReady, onBudgetResolved } = {}) => {
-    const now = new Date();
+    const now      = new Date();
     const thisYear = now.getFullYear();
     const wideStart = `${thisYear - 1}-01-01`;
-    const wideEnd = `${thisYear + 1}-12-31`;
+    const wideEnd   = `${thisYear + 1}-12-31`;
 
     const budgetRes = await request(`/api/firefly/budgets?limit=50`);
-    const budgets = budgetRes.data || [];
+    const budgets   = budgetRes.data || [];
 
     // Notify caller with name-only list right away so pills render immediately
     if (onBudgetsReady) onBudgetsReady(budgets);
@@ -104,7 +97,7 @@ export const firefly = {
 
         limits.forEach(l => {
           const s = (l.attributes?.start || '').slice(0, 10);
-          const e = (l.attributes?.end || '').slice(0, 10);
+          const e = (l.attributes?.end   || '').slice(0, 10);
           if (s && e && s >= '2024-11-01') {
             const key = `${s}|${e}`;
             if (!periodMap[key]) periodMap[key] = { start: s, end: e };
@@ -114,7 +107,7 @@ export const firefly = {
         const spent = limits
           .filter(l => {
             const s = (l.attributes?.start || '').slice(0, 10);
-            const e = (l.attributes?.end || '').slice(0, 10);
+            const e = (l.attributes?.end   || '').slice(0, 10);
             return s <= endStr && e >= startStr;
           })
           .reduce((sum, l) => {
