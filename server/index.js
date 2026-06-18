@@ -60,12 +60,38 @@ app.get('/api/firefly/*', async (req, res) => {
 
   try {
     const response = await fetch(targetUrl, {
+      redirect: 'manual',   // never follow redirects — a redirect means auth failed
       headers: {
         Authorization: `Bearer ${FIREFLY_TOKEN}`,
         Accept: 'application/vnd.api+json',
         'Content-Type': 'application/json',
       },
     });
+
+    // 3xx → Firefly rejected the token and is redirecting to its login page
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location') || '(unknown)';
+      console.error(`[proxy] Firefly redirected to ${location} — token invalid or expired`);
+      return res.status(401).json({
+        error: 'Firefly-III rejected the request (redirected to login)',
+        detail: 'The Bearer token is likely invalid or expired. Check FIREFLY_TOKEN in your environment.',
+        redirectedTo: location,
+        target: targetUrl,
+      });
+    }
+
+    // Guard against unexpected HTML responses (e.g. a misconfigured reverse proxy)
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('json')) {
+      const body = await response.text();
+      console.error(`[proxy] Firefly returned non-JSON (${contentType}):`, body.slice(0, 200));
+      return res.status(502).json({
+        error: 'Firefly-III returned an unexpected non-JSON response',
+        detail: `Content-Type was "${contentType}". First 200 chars: ${body.slice(0, 200)}`,
+        target: targetUrl,
+      });
+    }
+
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (err) {
