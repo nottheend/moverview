@@ -1,3 +1,6 @@
+[0.8.7]
+- update readme regarding token settings
+
 [0.8.6]
 - Revert: client-side error message formatting (caused raw JSON parse errors to surface)
 - Note: if you see auth errors, recreate your Personal Access Token in Firefly-III
