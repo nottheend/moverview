@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { firefly } from '../api.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -736,8 +737,21 @@ export default function DashboardPage({ user, onLogout }) {
 
   const loading = loadingTx;
 
-  const [customStart,  setCustomStart]  = useState('');
-  const [customEnd,    setCustomEnd]    = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── Filter state — initialised from URL on first load ────────────────────
+  const [customStart,      setCustomStart]      = useState(() => searchParams.get('from')   || '');
+  const [customEnd,        setCustomEnd]        = useState(() => searchParams.get('to')     || '');
+  const [filterCategory,   setFilterCategory]   = useState(() => searchParams.get('cat')    || null);
+  const [filterBudget,     setFilterBudget]     = useState(() => searchParams.get('budget') || null);
+  const [filterBill,       setFilterBill]       = useState(() => searchParams.get('bill')   || null);
+  const [filterTag,        setFilterTag]        = useState(() => searchParams.get('tag')    || null);
+  const [filterDestination,setFilterDestination]= useState(() => searchParams.get('acct')  || null);
+  const [filterTypes,      setFilterTypes]      = useState(() => {
+    const raw = searchParams.get('types');
+    return raw ? new Set(raw.split(',')) : new Set(['expense', 'income']);
+  });
+
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const pickerRef = useRef(null);
 
@@ -747,12 +761,21 @@ export default function DashboardPage({ user, onLogout }) {
     return null;
   }, [customStart, customEnd]);
 
-  const [filterCategory,   setFilterCategory]   = useState(null);
-  const [filterBudget,     setFilterBudget]      = useState(null);
-  const [filterBill,       setFilterBill]        = useState(null);
-  const [filterTag,        setFilterTag]         = useState(null);
-  const [filterTypes,      setFilterTypes]       = useState(new Set(['expense', 'income'])); // set of 'expense'|'income'|'transfer'
-  const [filterDestination,setFilterDestination] = useState(null);
+  // ── Sync filters → URL (only set params, never pollute with defaults) ─────
+  useEffect(() => {
+    const params = {};
+    if (customStart)       params.from   = customStart;
+    if (customEnd)         params.to     = customEnd;
+    if (filterCategory)    params.cat    = filterCategory;
+    if (filterBudget)      params.budget = filterBudget;
+    if (filterBill)        params.bill   = filterBill;
+    if (filterTag)         params.tag    = filterTag;
+    if (filterDestination) params.acct   = filterDestination;
+    // Only write types when it differs from the default (expense+income)
+    const typesStr = [...filterTypes].sort().join(',');
+    if (typesStr !== 'expense,income') params.types = typesStr;
+    setSearchParams(params, { replace: true });
+  }, [customStart, customEnd, filterCategory, filterBudget, filterBill, filterTag, filterDestination, filterTypes]);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
   const [categoriesOpen,   setCategoriesOpen]   = useState(false);
