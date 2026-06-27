@@ -749,7 +749,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [filterDestination,setFilterDestination]= useState(() => searchParams.get('acct')  || null);
   const [filterTypes,      setFilterTypes]      = useState(() => {
     const raw = searchParams.get('types');
-    return raw ? new Set(raw.split(',')) : new Set(['expense', 'income']);
+    return raw ? new Set(raw.split(',')) : new Set(['expense', 'income', 'transfer']);
   });
 
   const [pickerOpen,   setPickerOpen]   = useState(false);
@@ -771,9 +771,9 @@ export default function DashboardPage({ user, onLogout }) {
     if (filterBill)        params.bill   = filterBill;
     if (filterTag)         params.tag    = filterTag;
     if (filterDestination) params.acct   = filterDestination;
-    // Only write types when it differs from the default (expense+income)
+    // Only write types when something is deactivated from the full default set
     const typesStr = [...filterTypes].sort().join(',');
-    if (typesStr !== 'expense,income') params.types = typesStr;
+    if (typesStr !== 'expense,income,transfer') params.types = typesStr;
     setSearchParams(params, { replace: true });
   }, [customStart, customEnd, filterCategory, filterBudget, filterBill, filterTag, filterDestination, filterTypes]);
   const [page,             setPage]              = useState(1);
@@ -899,7 +899,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   function clearAll() {
     setFilterCategory(null); setFilterBudget(null); setFilterBill(null);
-    setFilterTag(null); setFilterTypes(new Set(['expense', 'income'])); setFilterDestination(null);
+    setFilterTag(null); setFilterTypes(new Set(['expense', 'income', 'transfer'])); setFilterDestination(null);
     setPage(1);
   }
 
@@ -920,7 +920,7 @@ export default function DashboardPage({ user, onLogout }) {
   const pageTxs    = filtered.slice(pageStart, pageStart + PAGE_SIZE);
   const pageGroups = groupByDate(pageTxs);
 
-  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterTypes.size || filterDestination;
+  const hasFilters = filterCategory || filterBudget || filterBill || filterTag || filterTypes.size < 3 || filterDestination;
 
   const filteredSummary = useMemo(() => {
     let income = 0, expense = 0;
