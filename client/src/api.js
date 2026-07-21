@@ -20,38 +20,85 @@ export const auth = {
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 };
 
+// Flatten split transactions: each split becomes its own row with a stable
+// synthetic id so deduplication and React keys work correctly.
+function flattenSplits(raw) {
+  const flat = [];
+  for (const tx of raw) {
+    const splits = tx.attributes?.transactions || [];
+    if (splits.length <= 1) {
+      flat.push(tx);
+    } else {
+      const groupTitle = tx.attributes?.group_title || splits[0]?.description || '';
+      for (let i = 0; i < splits.length; i++) {
+        flat.push({
+          ...tx,
+          id: `${tx.id}-s${i}`,
+          _splitIndex: i,
+          _groupTitle: groupTitle,
+          _isSplit: true,
+          attributes: {
+            ...tx.attributes,
+            transactions: [splits[i]],
+          },
+        });
+      }
+    }
+  }
+  return flat;
+}
+
+// Walk Firefly's pagination until every page is in. Firefly caps page size well
+// below our `limit`, so a year of data is several pages — silently keeping only
+// the first would understate every total in the report.
+async function fetchAllPages(path, { limit = 200, maxPages = 25 } = {}) {
+  const sep = path.includes('?') ? '&' : '?';
+  const out = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await request(`${path}${sep}page=${page}&limit=${limit}`);
+    out.push(...(res.data || []));
+    totalPages = res.meta?.pagination?.total_pages || 1;
+    page++;
+  } while (page <= totalPages && page <= maxPages);
+  return out;
+}
+
+// Tags are user-typed — never trust the casing.
+function splitHasTag(split, tag) {
+  const needle = tag.trim().toLowerCase();
+  return (split?.tags || []).some(t => String(t).trim().toLowerCase() === needle);
+}
+
 export const firefly = {
   accounts: (type = 'asset', page = 1) =>
     request(`/api/firefly/accounts?type=${type}&page=${page}`),
 
   transactions: async (startStr, endStr) => {
     const res = await request(`/api/firefly/transactions?page=1&limit=500&type=all&start=${startStr}&end=${endStr}`);
-    const raw = res.data || [];
-    // Flatten split transactions: each split becomes its own row with a stable
-    // synthetic id so deduplication and React keys work correctly.
-    const flat = [];
-    for (const tx of raw) {
-      const splits = tx.attributes?.transactions || [];
-      if (splits.length <= 1) {
-        flat.push(tx);
-      } else {
-        const groupTitle = tx.attributes?.group_title || splits[0]?.description || '';
-        for (let i = 0; i < splits.length; i++) {
-          flat.push({
-            ...tx,
-            id: `${tx.id}-s${i}`,
-            _splitIndex: i,
-            _groupTitle: groupTitle,
-            _isSplit: true,
-            attributes: {
-              ...tx.attributes,
-              transactions: [splits[i]],
-            },
-          });
-        }
-      }
+    return flattenSplits(res.data || []);
+  },
+
+  // All transactions carrying `tag`, flattened to one row per split.
+  //
+  // Firefly's tag endpoint returns whole groups when *any* split is tagged, so we
+  // still filter split-by-split afterwards — a €90 group where only the €30
+  // insurance split is tagged must contribute €30, not €90.
+  //
+  // If the tag endpoint is unavailable (older Firefly, proxy quirk) we fall back to
+  // the plain transaction list and filter client-side. Same result, more bytes.
+  taggedTransactions: async (tag, startStr, endStr) => {
+    const window = `start=${startStr}&end=${endStr}`;
+    let raw;
+    try {
+      raw = await fetchAllPages(`/api/firefly/tags/${encodeURIComponent(tag)}/transactions?${window}`);
+    } catch (err) {
+      if (err.status === 503) throw err;   // Firefly not configured — no point retrying
+      console.warn(`[api] tag endpoint failed (${err.message}) — falling back to full transaction scan`);
+      raw = await fetchAllPages(`/api/firefly/transactions?type=all&${window}`);
     }
-    return flat;
+    return flattenSplits(raw).filter(tx => splitHasTag(tx.attributes?.transactions?.[0], tag));
   },
 
   // Fetch all bills

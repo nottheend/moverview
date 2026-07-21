@@ -1,34 +1,10 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { firefly } from '../api.js';
+import { fmt, fmtDate, fmtDateShort, fmtDatePeriod } from '../format.js';
+import FixedCostsSection from '../components/FixedCostsSection.jsx';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmt(amount, symbol = '€') {
-  const n = parseFloat(amount);
-  return `${symbol}${Math.abs(n).toLocaleString('de-DE', {
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  })}`;
-}
-
-function fmtDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('de-DE', {
-    weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
-  });
-}
-
-function fmtDateShort(dateStr) {
-  return new Date(dateStr).toLocaleDateString('de-DE', {
-    day: '2-digit', month: '2-digit',
-  });
-}
-
-// For period labels — always include year
-function fmtDatePeriod(dateStr) {
-  return new Date(dateStr).toLocaleDateString('de-DE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
-}
 
 // Safely extract YYYY-MM-DD from either "2026-03-01" or "2026-03-01T00:00:00+00:00"
 
@@ -751,6 +727,7 @@ export default function DashboardPage({ user, onLogout }) {
     const raw = searchParams.get('types');
     return raw ? new Set(raw.split(',')) : new Set(['expense', 'income', 'transfer']);
   });
+  const [fixedOpen,        setFixedOpen]        = useState(() => searchParams.get('fixed') === '1');
 
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const pickerRef = useRef(null);
@@ -771,11 +748,12 @@ export default function DashboardPage({ user, onLogout }) {
     if (filterBill)        params.bill   = filterBill;
     if (filterTag)         params.tag    = filterTag;
     if (filterDestination) params.acct   = filterDestination;
+    if (fixedOpen)         params.fixed  = '1';
     // Only write types when something is deactivated from the full default set
     const typesStr = [...filterTypes].sort().join(',');
     if (typesStr !== 'expense,income,transfer') params.types = typesStr;
     setSearchParams(params, { replace: true });
-  }, [customStart, customEnd, filterCategory, filterBudget, filterBill, filterTag, filterDestination, filterTypes]);
+  }, [customStart, customEnd, filterCategory, filterBudget, filterBill, filterTag, filterDestination, filterTypes, fixedOpen]);
   const [page,             setPage]              = useState(1);
   const [accountsOpen,    setAccountsOpen]      = useState(false);
   const [categoriesOpen,   setCategoriesOpen]   = useState(false);
@@ -1109,6 +1087,15 @@ export default function DashboardPage({ user, onLogout }) {
                     })}
                   </div>
                 )}
+                <FixedCostsSection
+                  open={fixedOpen}
+                  onToggle={() => setFixedOpen(o => !o)}
+                  rangeTransactions={transactions}
+                  rangeStart={customStart}
+                  rangeEnd={customEnd}
+                  onFilterTag={v => applyFilter(setFilterTag, v)}
+                  onFilterAccount={v => applyFilter(setFilterDestination, v)}
+                />
                 {transactions.length > 0 && (
                   <AccountLineChart transactions={transactions} accounts={accounts} />
                 )}

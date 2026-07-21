@@ -1,3 +1,29 @@
+[0.10.0]
+- Feature: "Fixed costs" report — every transaction tagged "monthly recurring expense",
+  rolled up per month. Sits under the period summary, collapsed by default,
+  open state kept in the URL (?fixed=1)
+- Shows the month's total, item count, share of income, and the 12-month average
+- Per-item table grouped by bill → payee → description, with the expected amount
+  (6-month median), last charge date, and a flag when a charge drifts >5% from its median
+- Flags recurring items not yet booked this month, once their usual due day has passed
+- 12-month bar strip; click a bar to re-anchor the report to that month
+- Transfers count toward fixed costs (a paycheck arrives as a transfer here, so
+  transfers are real money movements); tagged deposits are ignored and flagged as
+  likely tagging slips
+- Tag matching is case-insensitive
+- API: new firefly.taggedTransactions() using Firefly's tag endpoint, with a fallback
+  to a full transaction scan if that endpoint is unavailable
+- Fix: Firefly pagination is now followed to the last page instead of silently
+  keeping only the first — long windows no longer understate totals
+- Chore: split-flattening extracted to one helper; formatters moved to client/src/format.js
+
+[0.9.1]
+- Fix: include transfer in default filterTypes, fix URL sync accordingly
+
+[0.9.0]
+- Feature: filter state syncs bidirectionally with URL search params — dashboard
+  views are now shareable and survive a reload
+
 [0.8.7]
 - update readme regarding token settings
 
