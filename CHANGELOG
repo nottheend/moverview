@@ -1,3 +1,9 @@
+[0.10.1]
+- Fix: Docker build no longer upgrades npm inside the image. npm 12 requires
+  Node ^22.22.2 while node:22-alpine ships 22.22.1, so `npm install -g npm@latest`
+  broke every build the day npm 12 landed. The bundled npm builds the client fine,
+  and the build no longer depends on what npm published today.
+
 [0.10.0]
 - Feature: "Fixed costs" report — every transaction tagged "monthly recurring expense",
   rolled up per month. Sits under the period summary, collapsed by default,
