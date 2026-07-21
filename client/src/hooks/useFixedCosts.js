@@ -156,9 +156,11 @@ export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
     };
   });
 
-  // Sort: current month's biggest first, then items missing from this month,
-  // then everything dormant.
-  items.sort((a, b) => (b.current - a.current) || (b.expected - a.expected));
+  // Rank by what an item costs when it is charged, not by whether it already hit
+  // this month — otherwise a rent that has not been booked yet sorts below a €14
+  // subscription, which is exactly when you want to see it at the top.
+  const weight = i => Math.max(i.current, i.expected);
+  items.sort((a, b) => weight(b) - weight(a));
 
   const total     = monthTotals[anchorMonth] || 0;
   const active    = items.filter(i => i.current > 0);

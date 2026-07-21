@@ -12,7 +12,7 @@ const STATUS = {
   up:      { label: '▲',          className: 'bg-red-50 text-red-600 border-red-200' },
   down:    { label: '▼',          className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   new:     { label: 'new',        className: 'bg-blue-50 text-blue-600 border-blue-200' },
-  idle:    { label: '—',          className: 'bg-stone-50 text-stone-400 border-stone-200' },
+  idle:    { label: 'not this month', className: 'bg-stone-50 text-stone-400 border-stone-200' },
 };
 
 function StatusBadge({ item }) {

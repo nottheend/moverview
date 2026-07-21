@@ -1,3 +1,9 @@
+[0.10.3]
+- Fixed costs: sort by what an item costs when charged (this month's amount, or its
+  expected amount if not booked yet), so a rent that has not hit yet stays at the top
+  instead of sinking below a €14 subscription
+- Fixed costs: dormant rows now say "not this month" instead of showing a bare dash
+
 [0.10.2]
 - Fix: fixed costs took minutes to load. Firefly's tag endpoint returns every match
   on page one but reports the *unfiltered* transaction count in meta.pagination
