@@ -1,3 +1,10 @@
+[0.10.2]
+- Fix: fixed costs took minutes to load. Firefly's tag endpoint returns every match
+  on page one but reports the *unfiltered* transaction count in meta.pagination
+  ("24 pages" for 62 results), so pagination walked 23 empty pages at ~1.2s each.
+  Paging now stops on the first short page — 24 requests down to 1
+- Fixed costs: bigger total, and a real spinner while the 12 months load
+
 [0.10.1]
 - Fix: Docker build no longer upgrades npm inside the image. npm 12 requires
   Node ^22.22.2 while node:22-alpine ships 22.22.1, so `npm install -g npm@latest`

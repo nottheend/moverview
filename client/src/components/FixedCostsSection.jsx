@@ -156,7 +156,9 @@ export default function FixedCostsSection({
                 aria-label="Next month">→</button>
             </div>
             <div className="flex-1 min-w-0 text-right">
-              <p className="text-lg font-bold tabular-nums text-stone-800">{fmt(total)}</p>
+              <p className="text-2xl font-bold tabular-nums text-stone-800 leading-tight">
+                {loading ? <span className="text-stone-300">—</span> : fmt(total)}
+              </p>
               <p className="text-xs text-stone-400 mt-0.5">
                 {active.length} item{active.length === 1 ? '' : 's'}
                 {share !== null && ` · ${share}% of income`}
@@ -166,7 +168,14 @@ export default function FixedCostsSection({
           </div>
 
           {loading && (
-            <p className="py-8 text-center text-stone-300 text-sm">Loading fixed costs…</p>
+            <div className="flex items-center justify-center gap-2.5 py-10">
+              <span className="animate-spin" style={{
+                width: 15, height: 15, flexShrink: 0,
+                border: '2px solid #d6d3d1', borderTopColor: '#292524',
+                borderRadius: '50%', display: 'inline-block',
+              }} />
+              <span className="text-sm text-stone-500">Loading 12 months of tagged transactions…</span>
+            </div>
           )}
 
           {error && (

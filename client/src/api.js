@@ -48,20 +48,23 @@ function flattenSplits(raw) {
   return flat;
 }
 
-// Walk Firefly's pagination until every page is in. Firefly caps page size well
-// below our `limit`, so a year of data is several pages — silently keeping only
-// the first would understate every total in the report.
+// Walk Firefly's pagination until every page is in.
+//
+// Do NOT trust meta.pagination.total_pages: on /tags/{tag}/transactions Firefly
+// reports the *unfiltered* transaction count (4787 → "24 pages") while actually
+// returning every match on page one. Following that number means two dozen empty
+// round trips at ~1.2s each.
+//
+// The page contents are the only honest signal — a short or empty page is the end.
 async function fetchAllPages(path, { limit = 200, maxPages = 25 } = {}) {
   const sep = path.includes('?') ? '&' : '?';
   const out = [];
-  let page = 1;
-  let totalPages = 1;
-  do {
+  for (let page = 1; page <= maxPages; page++) {
     const res = await request(`${path}${sep}page=${page}&limit=${limit}`);
-    out.push(...(res.data || []));
-    totalPages = res.meta?.pagination?.total_pages || 1;
-    page++;
-  } while (page <= totalPages && page <= maxPages);
+    const batch = res.data || [];
+    out.push(...batch);
+    if (batch.length < limit) break;
+  }
   return out;
 }
 
