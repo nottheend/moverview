@@ -1093,6 +1093,7 @@ export default function DashboardPage({ user, onLogout }) {
                   rangeTransactions={transactions}
                   rangeStart={customStart}
                   rangeEnd={customEnd}
+                  bills={bills}
                   onFilterTag={v => applyFilter(setFilterTag, v)}
                   onFilterAccount={v => applyFilter(setFilterDestination, v)}
                 />

@@ -1,3 +1,24 @@
+[0.10.4]
+- Fixed costs: renamed to "Fixed monthly spendings", on a highlighted background, with a
+  one-line explanation of what the section is for — "Fixed costs" alone did not say that
+  these are the commitments you cannot cancel on short notice. The highlight uses the tag
+  palette, not amber, so it does not read as another "not booked" warning
+- Fixed costs: the footer toggle said "Show all N items" without saying what the other
+  items were. It now names them: "Show N recurring items not charged this month",
+  and disappears when there are none
+- Fixed costs: headline count reads "N charged so far" instead of "N items"
+- Fixed costs: cadence and due date now come from the Firefly bill when a transaction
+  carries one, instead of being inferred from past charges. An item that moved from the
+  1st to the 20th no longer reads as overdue for three weeks, quarterly items say
+  "quarterly" instead of "irregular", and rows show the bill's next expected date.
+  Bills already loaded for the Bills section, so this costs no extra request.
+  Inactive bills are ignored and fall back to the inferred cadence
+- Fixed costs: items last charged over three months ago (and beyond twice their own
+  charge interval) are flagged "possibly cancelled" — a dead tag otherwise sits in the
+  list forever and drags the 12-month average
+- Fixed costs: a month mixing currencies now says so. Amounts were being summed at face
+  value with no conversion; that still happens, but it is no longer silent
+
 [0.10.3]
 - Fixed costs: sort by what an item costs when charged (this month's amount, or its
   expected amount if not booked yet), so a rent that has not hit yet stays at the top

@@ -13,6 +13,7 @@ const STATUS = {
   down:    { label: '▼',          className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   new:     { label: 'new',        className: 'bg-blue-50 text-blue-600 border-blue-200' },
   idle:    { label: 'not this month', className: 'bg-stone-50 text-stone-400 border-stone-200' },
+  stale:   { label: 'possibly cancelled', className: 'bg-stone-100 text-stone-500 border-stone-300' },
 };
 
 function StatusBadge({ item }) {
@@ -88,14 +89,17 @@ function ItemRow({ item, onFilterAccount }) {
           <span className={`text-sm truncate ${dim ? 'text-stone-400' : 'text-stone-800'}`}>{item.label}</span>
           {item.isTransfer && <span className="text-xs text-indigo-500 shrink-0" title="Transfer">⇄</span>}
           {!item.monthly && (
-            <span className="text-xs text-stone-400 shrink-0" title="Not charged every month">
-              irregular{item.amortised ? ` · ${fmt(item.amortised, item.currency)}/mo` : ''}
+            <span className="text-xs text-stone-400 shrink-0"
+              title={item.freqLabel ? `Firefly bill: ${item.freqLabel}` : 'Not charged every month'}>
+              {item.freqLabel || 'irregular'}
+              {item.amortised ? ` · ${fmt(item.amortised, item.currency)}/mo` : ''}
             </span>
           )}
         </div>
         <p className="text-xs text-stone-400 mt-0.5">
           {item.lastDate ? `last ${fmtDateShort(item.lastDate)}` : '—'}
           {item.expected > 0 && ` · Ø ${fmt(item.expected, item.currency)}`}
+          {item.nextDue && ` · next ${fmtDateShort(item.nextDue)}`}
         </p>
       </div>
       <StatusBadge item={item} />
@@ -109,13 +113,15 @@ function ItemRow({ item, onFilterAccount }) {
 // ── Section ──────────────────────────────────────────────────────────────────
 
 export default function FixedCostsSection({
-  open, onToggle, rangeTransactions, rangeStart, rangeEnd, onFilterTag, onFilterAccount,
+  open, onToggle, rangeTransactions, rangeStart, rangeEnd, bills, onFilterTag, onFilterAccount,
 }) {
   const [anchorMonth, setAnchorMonth] = useState(() => currentMonthKey());
   const [showAll, setShowAll] = useState(false);
 
-  const { items, active, missing, misfiled, monthTotals, total, average, months, loading, error } =
-    useFixedCosts(anchorMonth, { enabled: open });
+  const {
+    items, active, missing, stale, misfiled, monthTotals, total, average,
+    currencies, mixedCurrency, months, loading, error,
+  } = useFixedCosts(anchorMonth, { enabled: open, bills });
 
   // Income is only trustworthy when the dashboard's loaded range covers the whole
   // anchor month — otherwise we'd divide by a partial month and overstate the ratio.
@@ -127,12 +133,18 @@ export default function FixedCostsSection({
 
   const share = income > 0 ? Math.round(total / income * 100) : null;
   const visible = showAll ? items : active;
+  // Everything tagged in the last 12 months that has not been charged in the anchor
+  // month — quarterly bills, cancelled subscriptions, and anything still outstanding.
+  const dormant = items.length - active.length;
 
   return (
     <section className="mb-4">
       <button onClick={onToggle} className="w-full flex items-center justify-between mb-2 group">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
-          Fixed costs
+        {/* Highlighted on the tag palette, not the amber one — amber is taken by the
+            "not booked" warnings below and the two must not read as the same thing. */}
+        <h2 className="text-xs font-semibold uppercase tracking-widest px-2 py-1 -ml-2 rounded border transition-colors"
+          style={{ background: '#f5eeda', color: '#8a7444', borderColor: '#ddd0a8' }}>
+          Fixed monthly spendings
         </h2>
         <span className="text-stone-300 group-hover:text-stone-500 transition-colors text-sm">
           {open ? '▲' : '▼'}
@@ -141,6 +153,10 @@ export default function FixedCostsSection({
 
       {open && (
         <div className="rounded-none sm:rounded-lg border-y sm:border border-stone-200 bg-white overflow-hidden">
+
+          <p className="px-4 pt-3 text-xs text-stone-500">
+            Commitments you cannot cancel on short notice — everything tagged “{FIXED_TAG}”.
+          </p>
 
           {/* Headline */}
           <div className="flex items-center gap-4 px-4 py-3 border-b border-stone-100">
@@ -160,7 +176,7 @@ export default function FixedCostsSection({
                 {loading ? <span className="text-stone-300">—</span> : fmt(total)}
               </p>
               <p className="text-xs text-stone-400 mt-0.5">
-                {active.length} item{active.length === 1 ? '' : 's'}
+                {active.length} charged so far
                 {share !== null && ` · ${share}% of income`}
                 {average > 0 && ` · Ø ${fmt(average)}`}
               </p>
@@ -200,6 +216,18 @@ export default function FixedCostsSection({
                       {misfiled.length} tagged deposit{misfiled.length === 1 ? '' : 's'} ignored — likely a tagging slip.
                     </div>
                   )}
+                  {stale.length > 0 && (
+                    <div className="px-4 py-2 bg-stone-100 border-b border-stone-200 text-xs text-stone-600">
+                      {stale.length} tagged item{stale.length === 1 ? '' : 's'} last charged over three months
+                      ago — possibly cancelled, with the tag left behind: {stale.map(i => i.label).join(', ')}
+                    </div>
+                  )}
+                  {mixedCurrency && (
+                    <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-xs text-red-800">
+                      This month mixes {currencies.map(([sym, amt]) => `${fmt(amt, sym)}`).join(' and ')} —
+                      the total adds them at face value, no conversion applied.
+                    </div>
+                  )}
 
                   <div className="border-b border-stone-100">
                     <MonthBars months={months} monthTotals={monthTotals} anchorMonth={anchorMonth}
@@ -210,11 +238,15 @@ export default function FixedCostsSection({
                     <ItemRow key={item.key} item={item} onFilterAccount={onFilterAccount} />
                   ))}
 
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-stone-50">
-                    <button onClick={() => setShowAll(s => !s)}
-                      className="text-xs text-stone-400 hover:text-stone-700 underline">
-                      {showAll ? 'Only this month' : `Show all ${items.length} items`}
-                    </button>
+                  <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-stone-50">
+                    {dormant > 0 ? (
+                      <button onClick={() => setShowAll(s => !s)}
+                        className="text-xs text-stone-400 hover:text-stone-700 underline text-left">
+                        {showAll
+                          ? `Hide ${dormant} not charged this month`
+                          : `Show ${dormant} recurring item${dormant === 1 ? '' : 's'} not charged this month`}
+                      </button>
+                    ) : <span />}
                     <button onClick={() => onFilterTag(FIXED_TAG)}
                       className="text-xs text-stone-400 hover:text-stone-700 underline">
                       Filter transactions by this tag

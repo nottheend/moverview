@@ -17,6 +17,41 @@ export const INCOME_SOURCE_ACCOUNTS = new Set(['Paycheck']);
 const MONTHS_BACK    = 12;
 const DRIFT_PCT      = 0.05;  // flag a charge deviating >5% from its own median
 const MEDIAN_SAMPLE  = 6;     // months of history the expected amount is drawn from
+const STALE_MONTHS   = 3;     // no charge for this long → probably cancelled, tag left behind
+
+// ── Firefly bill schedules ───────────────────────────────────────────────────
+//
+// When a split carries a bill, the bill knows the real cadence and the real due
+// date. That beats inferring both from past charges: an item that moved from the
+// 1st to the 20th otherwise reads as overdue for three weeks every month.
+
+const FREQ_MONTHS = { weekly: 0.25, monthly: 1, quarterly: 3, 'half-year': 6, yearly: 12 };
+const FREQ_LABEL  = { weekly: 'weekly', monthly: 'monthly', quarterly: 'quarterly', 'half-year': 'twice a year', yearly: 'yearly' };
+
+export function billIndex(bills = []) {
+  const map = new Map();
+  for (const b of bills) {
+    const attr = b?.attributes;
+    // An inactive bill is not evidence that anything is still due — ignore it and
+    // let the item fall back to what its own charge history says.
+    if (!attr?.name || attr.active === false) continue;
+    map.set(attr.name, attr);
+  }
+  return map;
+}
+
+// Months between charges, honouring Firefly's "skip n periods" setting
+function billPeriodMonths(bill) {
+  const base = FREQ_MONTHS[bill?.repeat_freq];
+  if (!base) return null;
+  return base * ((bill.skip || 0) + 1);
+}
+
+function billFreqLabel(bill) {
+  const label = FREQ_LABEL[bill?.repeat_freq];
+  if (!label) return null;
+  return bill.skip ? `every ${(bill.skip || 0) + 1}× ${label}` : label;
+}
 
 // ── Month helpers — string maths, no timezone surprises ──────────────────────
 
@@ -68,11 +103,13 @@ function itemKeyOf(split) {
   return split.bill_name || split.destination_name || split.description || '—';
 }
 
-export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
+export function buildFixedCosts(txs, months, anchorMonth, { today = new Date(), bills = [] } = {}) {
   const inWindow    = new Set(months);
   const monthTotals = Object.fromEntries(months.map(m => [m, 0]));
   const byKey       = new Map();
   const misfiled    = [];   // tagged deposits — flagged, never counted
+  const byCurrency  = {};   // anchor-month total per currency symbol — see mixedCurrency below
+  const byBill      = billIndex(bills);
 
   for (const tx of txs) {
     const split = tx.attributes?.transactions?.[0];
@@ -91,14 +128,18 @@ export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
 
     monthTotals[month] += amount;
 
+    const symbol = split.currency_symbol || '€';
+    if (month === anchorMonth) byCurrency[symbol] = (byCurrency[symbol] || 0) + amount;
+
     const key = itemKeyOf(split);
     let item = byKey.get(key);
     if (!item) {
       item = {
         key,
         label: key,
-        currency: split.currency_symbol || '€',
+        currency: symbol,
         currencyCode: split.currency_code || null,
+        billName: split.bill_name || null,
         isTransfer: split.type === 'transfer',
         account: split.destination_name || split.source_name || null,
         byMonth: {},
@@ -107,6 +148,7 @@ export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
       };
       byKey.set(key, item);
     }
+    if (!item.billName && split.bill_name) item.billName = split.bill_name;
     item.byMonth[month] = (item.byMonth[month] || 0) + amount;
     item.days.push(new Date(split.date).getDate());
     if (!item.lastDate || split.date > item.lastDate) item.lastDate = split.date;
@@ -125,17 +167,39 @@ export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
     const current  = item.byMonth[anchorMonth] || 0;
     const typicalDay = Math.round(median(item.days)) || 1;
 
+    // The bill, when there is one, is the authority on both cadence and due date.
+    const bill        = item.billName ? byBill.get(item.billName) : null;
+    const periodMonths = bill ? billPeriodMonths(bill) : null;
+    const freqLabel   = bill ? billFreqLabel(bill) : null;
+
     // Cadence: an item present in most months since it first appeared is monthly.
     // Quarterly/annual items keep the tag but must not read as "missing" every month.
     const firstIdx = months.indexOf(seen[0]);
     const spanned  = firstIdx === -1 ? 0 : months.length - firstIdx;
-    const monthly  = spanned > 0 && seen.length / spanned >= 0.6;
+    const monthly  = periodMonths !== null
+      ? periodMonths <= 1
+      : spanned > 0 && seen.length / spanned >= 0.6;
+
+    // Due day: the bill's next expected date beats the median day of past charges.
+    const dueDay = bill?.next_expected_match
+      ? new Date(bill.next_expected_match).getDate()
+      : typicalDay;
+
+    // Months since the last charge — anchor month is the last slot in the window
+    const lastSeen = seen[seen.length - 1];
+    const monthsIdle = lastSeen ? months.length - 1 - months.indexOf(lastSeen) : null;
 
     let status = 'ok';
     if (current === 0) {
-      const recentlySeen  = prev3.filter(m => item.byMonth[m] > 0).length >= 2;
-      const dueDatePassed = !isCurrentMonth || today.getDate() > typicalDay;
+      // A bill is its own evidence that the item is still live; without one we
+      // want two of the last three months before calling a charge overdue.
+      const recentlySeen  = bill ? true : prev3.filter(m => item.byMonth[m] > 0).length >= 2;
+      const dueDatePassed = !isCurrentMonth || today.getDate() > dueDay;
       if (monthly && recentlySeen && dueDatePassed) status = 'missing';
+      // "Probably cancelled" has to clear the item's own rhythm, or every quarterly
+      // charge would read as dead the month before it is due.
+      else if (!bill && monthsIdle !== null &&
+               monthsIdle >= Math.max(STALE_MONTHS, 2 * (spanned / seen.length))) status = 'stale';
       else status = 'idle';
     } else if (seen.length === 1) {
       status = 'new';
@@ -149,6 +213,11 @@ export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
       expected,
       current,
       typicalDay,
+      dueDay,
+      monthsIdle,
+      hasBill: !!bill,
+      freqLabel,
+      nextDue: bill?.next_expected_match || null,
       monthly,
       status,
       // What an irregular item costs per month once spread across the window
@@ -165,10 +234,19 @@ export function buildFixedCosts(txs, months, anchorMonth, today = new Date()) {
   const total     = monthTotals[anchorMonth] || 0;
   const active    = items.filter(i => i.current > 0);
   const missing   = items.filter(i => i.status === 'missing');
+  const stale     = items.filter(i => i.status === 'stale');
   const withHistory = months.filter(m => monthTotals[m] > 0);
   const average   = withHistory.length ? withHistory.reduce((s, m) => s + monthTotals[m], 0) / withHistory.length : 0;
 
-  return { items, active, missing, misfiled, monthTotals, total, average };
+  // Amounts are summed at face value — Firefly gives us no rate here, so a mixed
+  // month is reported rather than silently converted at 1:1.
+  const currencies = Object.entries(byCurrency).sort((a, b) => b[1] - a[1]);
+
+  return {
+    items, active, missing, stale, misfiled, monthTotals, total, average,
+    currencies,
+    mixedCurrency: currencies.length > 1,
+  };
 }
 
 // Income for a month, from transactions the dashboard already holds.
@@ -187,7 +265,7 @@ export function incomeForMonth(txs, month) {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useFixedCosts(anchorMonth, { tag = FIXED_TAG, enabled = true } = {}) {
+export function useFixedCosts(anchorMonth, { tag = FIXED_TAG, enabled = true, bills = [] } = {}) {
   const [txs,     setTxs]     = useState([]);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
@@ -209,8 +287,8 @@ export function useFixedCosts(anchorMonth, { tag = FIXED_TAG, enabled = true } =
   }, [tag, start, end, enabled]);
 
   const report = useMemo(
-    () => buildFixedCosts(txs, months, anchorMonth),
-    [txs, months, anchorMonth]
+    () => buildFixedCosts(txs, months, anchorMonth, { bills }),
+    [txs, months, anchorMonth, bills]
   );
 
   return { ...report, months, loading, error };
