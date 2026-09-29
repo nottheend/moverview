@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { firefly } from '../api.js';
 import { fmt, fmtDate, fmtDateShort, fmtDatePeriod } from '../format.js';
 import FixedCostsSection from '../components/FixedCostsSection.jsx';
+import MonthlyOverview from '../components/MonthlyOverview.jsx';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -992,6 +993,12 @@ export default function DashboardPage({ user, onLogout }) {
             {error}
           </div>
         )}
+
+        {/* Outside the loading gate: it is independent of the date picker (always the
+            last 12 calendar months) and must not refetch every time the range changes */}
+        <div className="px-4 sm:px-0">
+          <MonthlyOverview />
+        </div>
 
         {loading ? (
           <p className="text-stone-400 text-sm py-12 text-center">Loading transactions…</p>

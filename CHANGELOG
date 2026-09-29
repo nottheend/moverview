@@ -1,3 +1,13 @@
+[0.11.0]
+- Feature: "Income vs. spending" at the top of the dashboard, always visible and
+  independent of the date picker — income and spending per calendar month for the
+  last 12 months, with the monthly average of spending, income and what is left over.
+  Spending is every withdrawal, income every deposit; transfers between own accounts
+  are left out, so the salary (deposit into Paycheck, then transferred on) counts once.
+  The running month is drawn faded and kept out of the averages
+- Totals come from Firefly's insight endpoints (/insight/expense/total,
+  /insight/income/total): 26 small requests instead of a year of transactions
+
 [0.10.4]
 - Fixed costs: renamed to "Fixed monthly spendings", on a highlighted background, with a
   one-line explanation of what the section is for — "Fixed costs" alone did not say that

@@ -83,6 +83,16 @@ export const firefly = {
     return flattenSplits(res.data || []);
   },
 
+  // Firefly-computed sum of all withdrawals ('expense') or deposits ('income') in
+  // the range — one small response instead of every transaction. Firefly returns
+  // one entry per currency; amounts are added at face value, like everywhere else.
+  // Scope is Firefly's default: asset accounts (liability-account spending is not in it).
+  insightTotal: async (kind, startStr, endStr) => {
+    const res = await request(`/api/firefly/insight/${kind}/total?start=${startStr}&end=${endStr}`);
+    const entries = Array.isArray(res) ? res : (res.data || []);
+    return entries.reduce((sum, e) => sum + Math.abs(e.difference_float ?? parseFloat(e.difference || 0)), 0);
+  },
+
   // All transactions carrying `tag`, flattened to one row per split.
   //
   // Firefly's tag endpoint returns whole groups when *any* split is tagged, so we
